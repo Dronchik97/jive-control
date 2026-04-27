@@ -3,36 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        body { background: #000; color: #0f0; text-align: center; font-family: sans-serif; padding: 20px; }
+        body { background: #000; color: #0f0; text-align: center; font-family: monospace; padding: 20px; }
         .panel { border: 2px solid #0f0; padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; }
         .btn { padding: 15px; margin: 10px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; background: #333; color: white; }
-        .vibe { background: #ff00ff; }
-        input[type=range] { width: 100%; height: 30px; }
+        .vibe { background: #ff00ff; color: #fff; }
+        .stop { background: #f00; color: #fff; }
     </style>
 </head>
 <body>
     <div class="panel">
-        <h3>JIVE: VIBRO ONLY MODE</h3>
+        <h3>JIVE: MUSIC vs VIBE</h3>
         <div id="st">СТАТУС: OFF</div>
-        <button class="btn" style="background:#0066ff" onclick="conn()">🔌 1. КОННЕКТ</button>
+        <button class="btn" style="background:#0066ff" onclick="conn()">🔌 ПІДКЛЮЧИТИСЬ</button>
 
-        <div style="margin: 20px 0;">
-            <label>ШУКАЄМО ВІБРО: <span id="pV">100</span></label>
-            <input type="range" min="0" max="255" value="100" id="pwr">
-        </div>
+        <p>Спробуй ці кнопки. Шукаємо де вібро без толкачок:</p>
+        
+        <button class="btn vibe" onclick="send([16, 120])">ВІБРО (Канал 16)</button>
+        <button class="btn vibe" onclick="send([11, 120])">ВІБРО (Канал 11)</button>
+        <button class="btn vibe" onclick="send([4, 120])">ВІБРО (Канал 4)</button>
+        
+        <hr>
+        <p>Режим "Тільки 2-й мотор":</p>
+        <button class="btn vibe" onclick="send([1, 0, 150])">1-й: 0, 2-й: 150</button>
 
-        <!-- Пробуємо канали, які зазвичай ідуть суто на вібро -->
-        <button class="btn vibe" onclick="send([11, getV()])">ВІБРО (Канал 11)</button>
-        <button class="btn vibe" onclick="send([16, getV()])">ВІБРО (Канал 16)</button>
-        <button class="btn vibe" onclick="send([4, getV()])">ВІБРО (Канал 4)</button>
-        <button class="btn vibe" onclick="send([1, 0, getV()])">ВІБРО (3-байт: 0, X)</button>
-
-        <button class="btn" style="background:red" onclick="send([1, 0])">🛑 СТОП</button>
+        <button class="btn stop" onclick="fullStop()">🛑 СТОП</button>
     </div>
 
     <script>
         let d, c;
-        const getV = () => parseInt(document.getElementById('pwr').value);
 
         async function conn() {
             try {
@@ -49,6 +47,14 @@
         async function send(arr) {
             if (!c) return;
             try { await c.writeValueWithoutResponse(new Uint8Array(arr)); } catch (e) {}
+        }
+
+        async function fullStop() {
+            if(c) {
+                await c.writeValueWithoutResponse(new Uint8Array([1, 0]));
+                await c.writeValueWithoutResponse(new Uint8Array([16, 0]));
+            }
+            document.getElementById('st').innerText = "🛑 STOP";
         }
     </script>
 </body>

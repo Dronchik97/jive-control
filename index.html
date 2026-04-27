@@ -4,29 +4,41 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { background: #121212; color: white; text-align: center; font-family: sans-serif; padding: 15px; }
-        .btn { padding: 15px; background: #0088cc; border: none; border-radius: 8px; color: white; width: 100%; font-size: 16px; margin-bottom: 10px; cursor: pointer; font-weight: bold; }
-        .scan-btn { background: #efa00b; color: black; }
+        body { background: #121212; color: white; text-align: center; font-family: sans-serif; padding: 10px; }
+        .card { background: #222; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #333; }
+        .btn { padding: 12px; background: #0088cc; border: none; border-radius: 8px; color: white; width: 100%; font-size: 16px; margin-bottom: 10px; cursor: pointer; font-weight: bold; }
         .stop-btn { background: #ff5252; }
-        #status { padding: 10px; border-radius: 5px; background: #222; font-size: 14px; color: #0ff; margin-bottom: 10px; }
-        #log { background: #000; padding: 10px; font-family: monospace; font-size: 12px; height: 150px; overflow-y: auto; text-align: left; border: 1px solid #333; }
-        .current-val { font-size: 24px; color: #efa00b; margin: 10px 0; font-weight: bold; }
+        .scan-btn { background: #efa00b; color: black; }
+        input[type=number] { width: 60px; padding: 8px; border-radius: 5px; border: none; text-align: center; }
+        #log { background: #000; padding: 10px; font-family: monospace; font-size: 11px; height: 120px; overflow-y: auto; text-align: left; border: 1px solid #444; }
+        .current { font-size: 28px; color: #efa00b; margin: 10px 0; }
     </style>
 </head>
 <body>
-    <h3>Jive: Авто-Сканер Команд</h3>
-    <div id="status">Статус: Підключіться</div>
-    
     <button class="btn" onclick="connect()">🔌 1. ПІДКЛЮЧИТИСЬ</button>
-    
-    <div class="current-val" id="display">Команда: ---</div>
 
-    <div style="display: flex; gap: 10px;">
-        <button class="btn scan-btn" onclick="startScan(0x01)">Сканувати 0x01</button>
-        <button class="btn scan-btn" onclick="startScan(0x0B)">Сканувати 0x0B</button>
+    <div class="card">
+        <h3>Налаштування сканера</h3>
+        Заголовок (HEX): <input type="number" id="headerInp" value="1"> <br><br>
+        Діапазон: від <input type="number" id="fromInp" value="0"> до <input type="number" id="toInp" value="20">
+        <p>Пауза (сек): <input type="number" id="stepInp" value="2"></p>
+        <button class="btn scan-btn" onclick="startCustomScan()">🚀 ЗАПУСТИТИ СКАН</button>
     </div>
 
-    <button class="btn stop-btn" onclick="stopScan()">🛑 ЗУПИНИТИ СКАНЕР</button>
+    <div class="card">
+        <div class="current" id="display">---</div>
+        <button class="btn stop-btn" onclick="stopScan()">🛑 ЗУПИНИТИ (0x01, 0x00)</button>
+    </div>
+
+    <div class="card">
+        <h3>Кілер-кнопки (тест вимкнення)</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 5px;">
+            <button class="btn stop-btn" onclick="sendMagic([0x01, 0x00])">1, 0</button>
+            <button class="btn stop-btn" onclick="sendMagic([0x0B, 0x00])">11, 0</button>
+            <button class="btn stop-btn" onclick="sendMagic([0x01, 0xFF])">1, 255</button>
+            <button class="btn stop-btn" onclick="sendMagic([0x00, 0x00])">0, 0</button>
+        </div>
+    </div>
 
     <div id="log">Логи перебору...</div>
 
@@ -51,38 +63,49 @@
                 const server = await device.gatt.connect();
                 const service = await server.getPrimaryService(SERVICE_UUID);
                 characteristic = await service.getCharacteristic(CHAR_UUID);
-                document.getElementById('status').innerText = "ПІДКЛЮЧЕНО ✅";
-                log("Готово до сканування.");
+                log("Підключено до: " + device.name);
             } catch (err) { log("Помилка: " + err); }
         }
 
-        async function startScan(header) {
-            if (!characteristic) return alert("Спочатку коннект!");
+        async function startCustomScan() {
+            if (!characteristic) return alert("Коннект де?");
             stopScan();
-            log("Запуск сканування заголовка " + header + "...");
             
-            let i = 0;
+            const head = parseInt(document.getElementById('headerInp').value);
+            const from = parseInt(document.getElementById('fromInp').value);
+            const to = parseInt(document.getElementById('toInp').value);
+            const step = parseInt(document.getElementById('stepInp').value) * 1000;
+
+            log("Скан заголовка " + head + " від " + from + " до " + to);
+            
+            let i = from;
             scanInterval = setInterval(async () => {
-                if (i > 20) {
+                if (i > to) {
                     stopScan();
-                    log("Сканування завершено.");
+                    log("Діапазон пройдено.");
                     return;
                 }
                 
                 try {
-                    const data = new Uint8Array([header, i]);
-                    await characteristic.writeValue(data);
-                    document.getElementById('display').innerText = "Команда: [" + header + ", " + i + "]";
-                    log("Спроба: " + header + ", " + i);
+                    await characteristic.writeValue(new Uint8Array([head, i]));
+                    document.getElementById('display').innerText = head + ", " + i;
                     i++;
-                } catch (e) { console.log(e); }
-            }, 2000); // Кожні 2 секунди нова команда, щоб ти встиг відчути
+                } catch (e) { log("Збій на " + i); }
+            }, step);
         }
 
         function stopScan() {
             clearInterval(scanInterval);
-            if (characteristic) characteristic.writeValue(new Uint8Array([0x01, 0x00]));
-            document.getElementById('display').innerText = "ЗУПИНЕНО";
+            sendMagic([0x01, 0x00]);
+            document.getElementById('display').innerText = "STOP";
+        }
+
+        async function sendMagic(bytes) {
+            if (!characteristic) return;
+            try {
+                await characteristic.writeValue(new Uint8Array(bytes));
+                log("Send: " + bytes);
+            } catch (e) { log("Err: " + e); }
         }
     </script>
 </body>

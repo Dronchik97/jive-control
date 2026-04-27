@@ -2,71 +2,92 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <title>JIVE HACKER PRO</title>
     <style>
-        body { background: #050505; color: #00ff00; text-align: center; font-family: monospace; padding: 20px; }
-        .box { border: 2px dashed #00ff00; padding: 20px; border-radius: 10px; background: #001100; }
-        .btn { padding: 15px; margin: 5px; border: none; border-radius: 5px; width: 100%; cursor: pointer; font-weight: bold; }
-        .conn { background: #0044ff; color: white; }
-        .send { background: #00ff00; color: black; }
-        .off { background: #aa0000; color: white; }
-        input[type=range] { width: 100%; margin: 20px 0; }
-        .label { font-size: 20px; }
+        body { background: #050505; color: #00ff00; text-align: center; font-family: 'Courier New', monospace; padding: 10px; }
+        .panel { border: 2px solid #00ff00; padding: 15px; border-radius: 15px; background: #001100; max-width: 400px; margin: auto; }
+        .btn { padding: 15px; margin: 5px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; text-transform: uppercase; }
+        .conn { background: #0044ff; color: white; box-shadow: 0 0 10px #0044ff; }
+        .mode-a { background: #ff00ff; color: white; }
+        .mode-b { background: #ffaa00; color: black; }
+        .stop { background: #aa0000; color: white; }
+        .status { font-size: 12px; margin-bottom: 10px; color: #88ff88; }
+        .group { border: 1px solid #333; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        input[type=range] { width: 90%; }
     </style>
 </head>
 <body>
-    <div class="box">
-        <h3>JIVE DEEP SCANNER</h3>
-        <div id="st">Статус: ВІДКЛЮЧЕНО</div>
-        <button class="btn conn" onclick="cn()">1. ПІДКЛЮЧИТИСЬ</button>
-        
-        <hr>
-        
-        <div class="label">ЗАГОЛОВОК (Byte 1): <span id="hV">1</span></div>
-        <input type="range" min="0" max="20" value="1" id="hS" oninput="update()">
-        
-        <div class="label">ЗНАЧЕННЯ (Byte 2): <span id="vV">0</span></div>
-        <input type="range" min="0" max="255" value="0" id="vS" oninput="update()">
 
-        <button class="btn send" onclick="sd()">ВІДПРАВИТИ КОМАНДУ</button>
-        <button class="btn off" onclick="kill()">🚫 ВІДКЛЮЧИТИСЬ</button>
+<div class="panel">
+    <h3>JIVE ULTIMATE CONTROL</h3>
+    <div id="st" class="status">СТАТУС: ВІДКЛЮЧЕНО</div>
+    
+    <button class="btn conn" onclick="connect()">🔌 ПІДКЛЮЧИТИСЬ (Chrome/Edge)</button>
+
+    <div class="group">
+        <div>ПОТУЖНІСТЬ: <span id="pV">100</span></div>
+        <input type="range" min="0" max="255" value="100" id="pwr" oninput="document.getElementById('pV').innerText=this.value">
     </div>
 
-    <script>
-        let d, c;
-        function update() {
-            document.getElementById('hV').innerText = document.getElementById('hS').value;
-            document.getElementById('vV').innerText = document.getElementById('vS').value;
-            // Відправляємо відразу при русі повзунка для швидкості
-            sd(); 
-        }
+    <div class="group">
+        <small>МЕТОД "КУЛЕМЕТ" (Швидкі імпульси)</small>
+        <button class="btn mode-a" onclick="startRapid()">🔥 ЗАПУСТИТИ ПОТІК</button>
+    </div>
 
-        async function cn() {
-            try {
-                d = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
-                });
-                const s = await d.gatt.connect();
-                const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
-                c = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-                document.getElementById('st').innerText = "Статус: ГОТОВО";
-            } catch (e) { alert(e); }
-        }
+    <div class="group">
+        <small>СПЕЦ-ПАКЕТИ (Шукаємо вібро-код)</small>
+        <button class="btn mode-b" onclick="sendPkg([255, 1, getP()])">ВАРІАНТ А (FF 01 XX)</button>
+        <button class="btn mode-b" onclick="sendPkg([1, 1, getP()])">ВАРІАНТ Б (01 01 XX)</button>
+        <button class="btn mode-b" onclick="sendPkg([1, getP(), getP()+1])">ВАРІАНТ В (SUM)</button>
+        <button class="btn mode-b" onclick="sendPkg([1, getP(), 0, 0, 0, 0, 0, 0])">ВАРІАНТ Г (8 BYTES)</button>
+    </div>
 
-        async function sd() {
-            if (!c) return;
-            let h = parseInt(document.getElementById('hS').value);
-            let v = parseInt(document.getElementById('vS').value);
-            try {
-                // Шлемо стандартну пачку з 2 байт
-                await c.writeValueWithoutResponse(new Uint8Array([h, v]));
-            } catch (e) {}
-        }
+    <button class="btn stop" onclick="stopAll()">🛑 СТОП / ВИМКНУТИ</button>
+</div>
 
-        async function kill() {
-            if (d) await d.gatt.disconnect();
-            document.getElementById('st').innerText = "Статус: ВІДКЛЮЧЕНО";
+<script>
+    let device, char, loop;
+
+    function getP() { return parseInt(document.getElementById('pwr').value); }
+
+    async function connect() {
+        try {
+            device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
+            });
+            const server = await device.gatt.connect();
+            const service = await server.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
+            char = await service.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
+            document.getElementById('st').innerText = "СТАТУС: ONLINE (ЗНАЙДЕНО " + char.uuid.slice(-4) + ")";
+        } catch (e) { 
+            document.getElementById('st').innerText = "ПОМИЛКА: " + e.message;
         }
-    </script>
+    }
+
+    async function sendPkg(arr) {
+        if (!char) return;
+        try {
+            // Пробуємо записати пакет
+            await char.writeValueWithoutResponse(new Uint8Array(arr));
+            console.log("Sent:", arr);
+        } catch (e) { console.log("Err:", e); }
+    }
+
+    function startRapid() {
+        stopAll();
+        document.getElementById('st').innerText = "СТАТУС: ПОТІК АКТИВНИЙ";
+        loop = setInterval(() => {
+            if(char) char.writeValueWithoutResponse(new Uint8Array([1, getP()]));
+        }, 30); // 30мс — імітація біта музики
+    }
+
+    function stopAll() {
+        clearInterval(loop);
+        if(char) char.writeValue(new Uint8Array([1, 0]));
+        document.getElementById('st').innerText = "СТАТУС: ПАУЗА / СТОП";
+    }
+</script>
+
 </body>
 </html>

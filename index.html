@@ -3,71 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        body { background: #000; color: #ff00ff; text-align: center; font-family: monospace; padding: 20px; }
-        .panel { border: 2px solid #ff00ff; padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; }
-        .btn { padding: 15px; margin: 10px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; }
-        .conn { background: #0066ff; color: #fff; }
-        .start { background: #00ff00; color: #000; }
-        #disp { font-size: 32px; margin: 20px; color: #fff; }
+        body { background: #000; color: #00ffcc; text-align: center; font-family: sans-serif; padding: 20px; }
+        .panel { border: 2px solid #00ffcc; padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; }
+        .slider-box { margin: 20px 0; }
+        input[type=range] { width: 100%; cursor: pointer; }
+        .label { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 5px; }
+        .btn { padding: 15px; margin: 10px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; background: #0066ff; color: white; }
     </style>
 </head>
 <body>
     <div class="panel">
-        <h3>JIVE: UNLOCK & SCAN</h3>
+        <h3>JIVE: DOUBLE COMMAND</h3>
         <div id="st">СТАТУС: OFF</div>
-        <button class="btn conn" onclick="conn()">🔌 1. КОННЕКТ</button>
-        <div id="disp">READY</div>
-        <button class="btn start" onclick="unlockAndRun()">🚀 РОЗБЛОКУВАТИ ТА СКАН</button>
-        <button class="btn" style="background:red; color:#fff" onclick="stopScan()">🛑 СТОП</button>
+        <button class="btn" onclick="conn()">🔌 1. КОННЕКТ</button>
+        
+        <div class="slider-box">
+            <div class="label"><span>ТОЛКАЧКИ (Byte 2):</span> <span id="v1">0</span></div>
+            <input type="range" min="0" max="255" value="0" id="s1" oninput="update()">
+        </div>
+
+        <div class="slider-box">
+            <div class="label"><span>ВІБРАЦІЯ (Byte 3):</span> <span id="v2">0</span></div>
+            <input type="range" min="0" max="255" value="0" id="s2" oninput="update()">
+        </div>
+
+        <button class="btn" style="background:red" onclick="stop()">🛑 ВСЕ ВИМКНУТИ</button>
     </div>
 
     <script>
-        let d, ch, scanner;
-        let val = 1;
+        let ch;
         const blackList = [8, 10];
 
         async function conn() {
             try {
-                d = await navigator.bluetooth.requestDevice({
+                const d = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true, optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
                 });
                 const s = await d.gatt.connect();
                 const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
                 ch = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
                 document.getElementById('st').innerText = "🟢 ПІДКЛЮЧЕНО";
+                // Шлемо "Handshake"
+                await ch.writeValueWithoutResponse(new Uint8Array([0xff, 0xff, 0xff]));
             } catch (e) { alert(e); }
         }
 
-        async function unlockAndRun() {
+        async function update() {
             if(!ch) return;
-            
-            // 1. Шлемо "Handshake" (команда пробудження)
+            let val1 = parseInt(document.getElementById('s1').value);
+            let val2 = parseInt(document.getElementById('s2').value);
+
+            // Авто-ігнор 8 і 10
+            if(blackList.includes(val1)) val1++;
+            if(blackList.includes(val2)) val2++;
+
+            document.getElementById('v1').innerText = val1;
+            document.getElementById('v2').innerText = val2;
+
             try {
-                await ch.writeValueWithoutResponse(new Uint8Array([0xff, 0xff, 0xff]));
-                await new Promise(r => setTimeout(r, 200));
-                await ch.writeValueWithoutResponse(new Uint8Array([0x01, 0x01, 0x01]));
-            } catch(e) {}
-
-            val = 1;
-            clearInterval(scanner);
-            document.getElementById('st').innerText = "📡 СКАН ПІСЛЯ UNLOCK";
-
-            scanner = setInterval(async () => {
-                if(val > 255) { stopScan(); return; }
-                if(blackList.includes(val)) { val++; return; }
-
-                document.getElementById('disp').innerText = val;
-                try {
-                    // Пробуємо стандартний Magic Motion пакет після розблокування
-                    await ch.writeValueWithoutResponse(new Uint8Array([1, val, 1]));
-                } catch (e) {}
-                val++; 
-            }, 150);
+                // Шлемо пакет [Header, Thrust, Vibe]
+                await ch.writeValueWithoutResponse(new Uint8Array([1, val1, val2]));
+            } catch (e) {}
         }
 
-        function stopScan() {
-            clearInterval(scanner);
-            document.getElementById('st').innerText = "🛑 СТОП";
+        async function stop() {
+            if(!ch) return;
+            document.getElementById('s1').value = 0;
+            document.getElementById('s2').value = 0;
+            document.getElementById('v1').innerText = 0;
+            document.getElementById('v2').innerText = 0;
+            await ch.writeValueWithoutResponse(new Uint8Array([1, 0, 0]));
         }
     </script>
 </body>

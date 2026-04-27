@@ -15,27 +15,27 @@
 </head>
 <body>
     <div class="panel">
-        <h3>JIVE: THRUST vs VIBE</h3>
-        <div id="st">🔴 OFF</div>
-        <button class="btn c" onclick="conn()">🔌 1. ПІДКЛЮЧИТИСЬ</button>
+        <h3>JIVE: КОНТРОЛЬ МОТОРІВ</h3>
+        <div id="st">🔴 СТАТУС: OFF</div>
+        <button class="btn c" onclick="conn()">🔌 1. КОННЕКТ</button>
 
         <div class="slider-group">
-            <label>ВІБРО (Шукаємо тут): <span id="vV">0</span></label>
-            <input type="range" min="0" max="255" value="0" id="vS" oninput="update()">
-        </div>
-
-        <div class="slider-group">
-            <label>ТОЛКАЧКИ (Твій рух): <span id="tV">0</span></label>
+            <label>ТОЛКАЧКИ (Заголовок 1): <span id="tV">0</span></label>
             <input type="range" min="0" max="255" value="0" id="tS" oninput="update()">
         </div>
 
-        <button class="btn vibe" onclick="tryVibeOnly()">🔥 ТІЛЬКИ ВІБРО (ТЕСТ)</button>
-        <button class="btn stop" onclick="stop()">🛑 ВСЕ ВИМКНУТИ</button>
+        <div class="slider-group" style="border-color: #ff00ff;">
+            <label>ВІБРО (Заголовок 2): <span id="vV">0</span></label>
+            <input type="range" min="0" max="255" value="0" id="vS" oninput="updateVibe()">
+        </div>
+
+        <button class="btn vibe" onclick="send([1, parseInt(tS.value), 255])">ТЕСТ: 3 БАЙТИ (Комбо)</button>
+        <button class="btn stop" onclick="stop()">🛑 ВИМКНУТИ ВСЕ</button>
     </div>
 
     <script>
         let d, c;
-        const vS = document.getElementById('vS'), tS = document.getElementById('tS');
+        const tS = document.getElementById('tS'), vS = document.getElementById('vS');
         
         async function conn() {
             try {
@@ -45,20 +45,20 @@
                 const s = await d.gatt.connect();
                 const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
                 c = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-                document.getElementById('st').innerText = "🟢 READY";
+                document.getElementById('st').innerText = "🟢 ПІДКЛЮЧЕНО";
             } catch (e) { alert(e); }
         }
 
+        // Керування толкачками (те, що ми вже знаємо)
         function update() {
-            document.getElementById('vV').innerText = vS.value;
             document.getElementById('tV').innerText = tS.value;
-            // Спроба №1: Пакет, де 2-й байт - вібро, 3-й - толкачки
-            send([1, parseInt(vS.value), parseInt(tS.value)]);
+            send([1, parseInt(tS.value)]); 
         }
 
-        async function tryVibeOnly() {
-            // Спроба №2: У багатьох Thrust-моделях вібро включається кодом 2
-            send([2, 150]); 
+        // Шукаємо вібро через заголовок 2
+        function updateVibe() {
+            document.getElementById('vV').innerText = vS.value;
+            send([2, parseInt(vS.value)]); 
         }
 
         async function send(arr) {
@@ -70,7 +70,7 @@
 
         function stop() {
             if(c) {
-                send([1, 0, 0]);
+                send([1, 0]);
                 send([2, 0]);
             }
         }

@@ -12,23 +12,25 @@
     </style>
 </head>
 <body>
-    <h3>Magic Motion: Пошук Вібрації</h3>
+    <h3>Magic Motion: Фінальний Тест</h3>
     <div id="status">Статус: Готовий</div>
-    <button class="btn" onclick="connect()">🔌 1. КОННЕКТ</button>
-    <button class="btn" style="background: #efa00b" onclick="sendMagic([0x01, 0x08])">⚡ 2. РЕЖИМ ГОТОВНОСТІ (1, 8)</button>
+    <button class="btn" onclick="connect()">🔌 ПІДКЛЮЧИТИСЬ</button>
+
+    <p>Твоя робоча команда:</p>
+    <button class="btn" style="background: #4CAF50" onclick="sendMagic([0x01, 0x08])">✅ ТОЛЧКИ (1, 8)</button>
 
     <hr>
-    <p>Спробуй ці команди для запуску вібро:</p>
+    <p>Спробуй ці (можливо, це вібро):</p>
     <div class="grid">
-        <button class="mode-btn" onclick="sendMagic([0x01, 0x01])">Cmd: 1, 1</button>
-        <button class="mode-btn" onclick="sendMagic([0x01, 0x05])">Cmd: 1, 5</button>
-        <button class="mode-btn" onclick="sendMagic([0x0b, 0x01, 0x01])">Cmd: 11, 1, 1</button>
-        <button class="mode-btn" onclick="sendMagic([0x10, 0x05])">Cmd: 16, 5</button>
-        <button class="mode-btn" onclick="sendMagic([0x0d, 0x05])">Cmd: 13, 5</button>
-        <button class="mode-btn" onclick="sendMagic([0x05, 0x01])">Cmd: 5, 1</button>
+        <button class="mode-btn" onclick="sendMagic([0x01, 0x09])">Cmd: 1, 9</button>
+        <button class="mode-btn" onclick="sendMagic([0x01, 0x0B])">Cmd: 1, 11</button>
+        <button class="mode-btn" onclick="sendMagic([0x01, 0x0D])">Cmd: 1, 13</button>
+        <button class="mode-btn" onclick="sendMagic([0x01, 0xFF])">Cmd: 1, 255</button>
+        <button class="mode-btn" onclick="sendMagic([0x0B, 0x08])">Cmd: 11, 8</button>
+        <button class="mode-btn" onclick="sendMagic([0x08, 0x01])">Cmd: 8, 1</button>
     </div>
 
-    <button class="btn" style="background:#ff5252" onclick="sendMagic([0x01, 0x00])">🔴 СТОП (1, 0)</button>
+    <button class="btn" style="background:#ff5252" onclick="sendMagic([0x01, 0x00])">🔴 СТОП</button>
 
     <script>
         let characteristic;

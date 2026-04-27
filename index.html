@@ -6,34 +6,41 @@
     <style>
         body { background: #121212; color: white; text-align: center; font-family: sans-serif; padding: 15px; }
         .btn { padding: 15px; background: #0088cc; border: none; border-radius: 8px; color: white; width: 100%; font-size: 16px; margin-bottom: 10px; cursor: pointer; font-weight: bold; }
-        .mode-btn { padding: 20px; background: #2c2c2c; border: 2px solid #444; border-radius: 12px; color: white; font-size: 14px; cursor: pointer; }
-        .mode-btn:active { background: #444; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; }
-        .stop-btn { background: #ff5252; margin-top: 20px; }
-        #status { padding: 10px; border-radius: 5px; background: #222; font-size: 13px; color: #00ff00; margin-bottom: 15px; }
+        .scan-btn { background: #efa00b; color: black; }
+        .stop-btn { background: #ff5252; }
+        #status { padding: 10px; border-radius: 5px; background: #222; font-size: 14px; color: #0ff; margin-bottom: 10px; }
+        #log { background: #000; padding: 10px; font-family: monospace; font-size: 12px; height: 150px; overflow-y: auto; text-align: left; border: 1px solid #333; }
+        .current-val { font-size: 24px; color: #efa00b; margin: 10px 0; font-weight: bold; }
     </style>
 </head>
 <body>
-    <h3>Magic Motion: Jive Pro Control</h3>
-    <div id="status">Статус: Готовий</div>
-    <button class="btn" onclick="connect()">🔌 ПІДКЛЮЧИТИСЬ</button>
+    <h3>Jive: Авто-Сканер Команд</h3>
+    <div id="status">Статус: Підключіться</div>
+    
+    <button class="btn" onclick="connect()">🔌 1. ПІДКЛЮЧИТИСЬ</button>
+    
+    <div class="current-val" id="display">Команда: ---</div>
 
-    <div class="grid">
-        <!-- Твої розгадані команди -->
-        <button class="mode-btn" onclick="sendMagic([0x0B, 0x08])">🚤 МАЛА ШВИДКІСТЬ<br>(11, 8)</button>
-        <button class="mode-btn" onclick="sendMagic([0x01, 0x08])">📉 СЕРЕДНІ ТОЛЧКИ<br>(1, 8)</button>
-        
-        <!-- Гіпотези на основі твоїх тестів -->
-        <button class="mode-btn" onclick="sendMagic([0x0B, 0x0A])">🚀 МАКС ШВИДКІСТЬ<br>(11, 10)</button>
-        <button class="mode-btn" onclick="sendMagic([0x01, 0x0A])">📈 СИЛЬНІ ТОЛЧКИ<br>(1, 10)</button>
+    <div style="display: flex; gap: 10px;">
+        <button class="btn scan-btn" onclick="startScan(0x01)">Сканувати 0x01</button>
+        <button class="btn scan-btn" onclick="startScan(0x0B)">Сканувати 0x0B</button>
     </div>
 
-    <button class="btn stop-btn" onclick="sendMagic([0x01, 0x00])">🔴 ПОВНА ЗУПИНКА</button>
+    <button class="btn stop-btn" onclick="stopScan()">🛑 ЗУПИНИТИ СКАНЕР</button>
+
+    <div id="log">Логи перебору...</div>
 
     <script>
         let characteristic;
+        let scanInterval;
         const SERVICE_UUID = '78667579-7b48-43db-b8c5-7928a6b0a335';
         const CHAR_UUID    = '78667579-a914-49a4-8333-aa3c0cd8fedc';
+
+        function log(msg) {
+            const l = document.getElementById('log');
+            l.innerHTML += "> " + msg + "<br>";
+            l.scrollTop = l.scrollHeight;
+        }
 
         async function connect() {
             try {
@@ -45,14 +52,37 @@
                 const service = await server.getPrimaryService(SERVICE_UUID);
                 characteristic = await service.getCharacteristic(CHAR_UUID);
                 document.getElementById('status').innerText = "ПІДКЛЮЧЕНО ✅";
-            } catch (err) { alert("Помилка: " + err); }
+                log("Готово до сканування.");
+            } catch (err) { log("Помилка: " + err); }
         }
 
-        async function sendMagic(bytes) {
-            if (!characteristic) return;
-            try {
-                await characteristic.writeValue(new Uint8Array(bytes));
-            } catch (err) { console.log("Помилка відправки"); }
+        async function startScan(header) {
+            if (!characteristic) return alert("Спочатку коннект!");
+            stopScan();
+            log("Запуск сканування заголовка " + header + "...");
+            
+            let i = 0;
+            scanInterval = setInterval(async () => {
+                if (i > 20) {
+                    stopScan();
+                    log("Сканування завершено.");
+                    return;
+                }
+                
+                try {
+                    const data = new Uint8Array([header, i]);
+                    await characteristic.writeValue(data);
+                    document.getElementById('display').innerText = "Команда: [" + header + ", " + i + "]";
+                    log("Спроба: " + header + ", " + i);
+                    i++;
+                } catch (e) { console.log(e); }
+            }, 2000); // Кожні 2 секунди нова команда, щоб ти встиг відчути
+        }
+
+        function stopScan() {
+            clearInterval(scanInterval);
+            if (characteristic) characteristic.writeValue(new Uint8Array([0x01, 0x00]));
+            document.getElementById('display').innerText = "ЗУПИНЕНО";
         }
     </script>
 </body>

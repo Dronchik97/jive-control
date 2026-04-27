@@ -5,62 +5,66 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body { background: #121212; color: white; text-align: center; font-family: sans-serif; padding: 20px; }
-        .btn { padding: 20px; background: #ff5722; border: none; border-radius: 12px; color: white; width: 100%; font-size: 20px; font-weight: bold; cursor: pointer; }
-        #status { color: #00e5ff; margin-top: 20px; font-size: 18px; }
-        .slider-container { margin-top: 40px; padding: 20px; background: #1e1e1e; border-radius: 15px; }
-        input[type=range] { width: 100%; height: 60px; }
+        .btn { padding: 20px; background: #4caf50; border: none; border-radius: 12px; color: white; width: 100%; font-size: 20px; cursor: pointer; }
+        #status { color: #ffeb3b; margin-top: 20px; font-family: monospace; font-size: 14px; text-align: left; background: #000; padding: 10px; }
+        input[type=range] { width: 100%; height: 60px; margin-top: 20px; }
     </style>
 </head>
 <body>
-    <h2>Jive Universal Control</h2>
-    <button class="btn" onclick="connect()">🔍 ЗНАЙТИ МІЙ JIVE</button>
-    
-    <div id="status">Натисніть кнопку пошуку</div>
-
-    <div class="slider-container">
-        <p>Керування вібрацією:</p>
-        <input type="range" min="0" max="100" value="0" oninput="sendSpeed(this.value)">
-        <h1 id="speedLabel">0%</h1>
-    </div>
+    <h3>Funtown Jive Debug Mode</h3>
+    <button class="btn" onclick="connect()">🔍 СКАНУВАТИ ТА ПІДКЛЮЧИТИ</button>
+    <input type="range" min="0" max="100" value="0" oninput="sendSpeed(this.value)">
+    <div id="status">Лог подій...</div>
 
     <script>
         let characteristic;
-        // Ті самі UUID, що ми вичислили
-        const SERVICE_UUID = '0000ff10-0000-1000-8000-00805f9b34fb';
-        const CHAR_UUID    = '0000ff11-0000-1000-8000-00805f9b34fb';
+
+        async function log(msg) {
+            document.getElementById('status').innerText += "\n> " + msg;
+        }
 
         async function connect() {
             try {
-                document.getElementById('status').innerText = "Відкриваю список пристроїв...";
-                
-                // acceptAllDevices дозволяє бачити все, не дивлячись на назву
+                log("Шукаю пристрій...");
                 const device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: [SERVICE_UUID]
+                    acceptAllDevices: true
                 });
 
-                document.getElementById('status').innerText = "Підключаюсь до " + device.name + "...";
-                
+                log("Підключення до " + device.name);
                 const server = await device.gatt.connect();
-                const service = await server.getPrimaryService(SERVICE_UUID);
-                characteristic = await service.getCharacteristic(CHAR_UUID);
                 
-                document.getElementById('status').innerText = "ЗВ'ЯЗОК Є! ✅ (Пристрій: " + device.name + ")";
+                log("Отримую список сервісів...");
+                const services = await server.getPrimaryServices();
+                
+                for (let service of services) {
+                    log("Знайдено сервіс: " + service.uuid);
+                    const chars = await service.getCharacteristics();
+                    for (let char of chars) {
+                        log("--- Характеристика: " + char.uuid);
+                        if (char.properties.write || char.properties.writeWithoutResponse) {
+                            characteristic = char;
+                            log("✅ ВИБРАНО ДЛЯ ЗАПИСУ!");
+                        }
+                    }
+                }
+                
+                if (characteristic) {
+                    log("🎉 ГОТОВО! Пробуй повзунок.");
+                } else {
+                    log("❌ Не знайдено портів для запису.");
+                }
             } catch (e) {
-                document.getElementById('status').innerText = "Помилка: " + e.message;
+                log("🚨 Помилка: " + e.message);
             }
         }
 
         async function sendSpeed(val) {
-            document.getElementById('speedLabel').innerText = val + "%";
             if (!characteristic) return;
             try {
-                // Відправляємо стандартний пакет для Magic Motion/Funtown
+                // Відправляємо 0x0b (Magic Motion) або 0x01 (простий протокол)
                 const data = new Uint8Array([0x0b, parseInt(val), 0x00, 0x00, 0x00]);
                 await characteristic.writeValue(data);
-            } catch (e) {
-                console.log("Помилка зв'язку: " + e);
-            }
+            } catch (e) {}
         }
     </script>
 </body>

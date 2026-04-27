@@ -3,30 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        body { background: #000; color: #00ffcc; text-align: center; font-family: monospace; padding: 20px; }
-        .panel { border: 2px solid #00ffcc; padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; }
+        body { background: #000; color: #ff0000; text-align: center; font-family: monospace; padding: 20px; }
+        .panel { border: 2px solid #ff0000; padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; }
         .btn { padding: 15px; margin: 10px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; }
-        #disp { font-size: 32px; margin: 20px; color: #fff; background: #222; padding: 10px; }
-        .log { font-size: 12px; color: #666; }
+        #disp { font-size: 28px; margin: 20px; color: #fff; background: #222; padding: 10px; }
     </style>
 </head>
 <body>
     <div class="panel">
-        <h3>JIVE: PRECISION SCAN</h3>
+        <h3>JIVE: 3-BYTE FORCE</h3>
         <div id="st">СТАТУС: OFF</div>
-        <button class="btn" style="background:#0066ff; color:white" onclick="conn()">🔌 КОННЕКТ</button>
-        
-        <div id="disp">0</div>
-        
-        <button class="btn" style="background:#ff00ff; color:white" onclick="runScan(16)">🚀 ТОЧНИЙ СКАН (H11)</button>
-        <button class="btn" style="background:red; color:white" onclick="stopScan()">🛑 СТОП</button>
-        
-        <div class="log">Крок: 1 | Пропускаємо: 8, 10</div>
+        <button class="btn" style="background:#0066ff; color:white" onclick="conn()">🔌 1. КОННЕКТ</button>
+        <div id="disp">[1, 0, 0]</div>
+        <button class="btn" style="background:#ff0000; color:white" onclick="runScan()">🚀 СТАРТ (3-BYTE SCAN)</button>
+        <button class="btn" style="background:#fff; color:#000" onclick="stopScan()">🛑 СТОП</button>
     </div>
 
     <script>
         let d, ch, scanner;
         let val = 1;
+        const blackList = [8, 10]; 
 
         async function conn() {
             try {
@@ -40,32 +36,27 @@
             } catch (e) { alert(e); }
         }
 
-        async function runScan(header) {
+        async function runScan() {
             if(!ch) return;
             val = 1;
             clearInterval(scanner);
-            document.getElementById('st').innerText = "📡 ШУКАЮ (HEADER " + header + ")...";
-
             scanner = setInterval(async () => {
                 if(val > 255) { stopScan(); return; }
-                
-                // Наш залізний ігнор
-                if(val === 8 || val === 10) { val++; return; }
+                if(blackList.includes(val)) { val++; return; }
 
-                document.getElementById('disp').innerText = val;
-                
+                document.getElementById('disp').innerText = `[1, 0, ${val}]`;
                 try {
-                    // Шлемо заголовок і точне значення
-                    await ch.writeValueWithoutResponse(new Uint8Array([header, val]));
+                    // Пробуємо заголовок 1, але з трьома байтами. 
+                    // Вібро часто сидить на 3-му байті в таких моделях.
+                    await ch.writeValueWithoutResponse(new Uint8Array([1, 0, val]));
                 } catch (e) {}
-                
                 val++; 
-            }, 150); // 0.15 сек — досить швидко, але контролер встигне «продуплити»
+            }, 150); 
         }
 
         function stopScan() {
             clearInterval(scanner);
-            document.getElementById('st').innerText = "🛑 ЗУПИНЕНО НА " + (val - 1);
+            document.getElementById('st').innerText = "🛑 СТОП";
         }
     </script>
 </body>

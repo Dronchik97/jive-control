@@ -3,68 +3,81 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { background: #121212; color: white; text-align: center; font-family: sans-serif; padding: 20px; }
-        .btn { padding: 15px; background: #0088cc; border: none; border-radius: 8px; color: white; width: 100%; font-size: 18px; margin-bottom: 20px; cursor: pointer; }
-        input[type=range] { width: 100%; height: 40px; margin-top: 20px; }
-        #status { margin-top: 20px; padding: 10px; border-radius: 5px; background: #222; }
+        body { background: #121212; color: white; text-align: center; font-family: sans-serif; padding: 15px; }
+        .btn { padding: 15px; background: #0088cc; border: none; border-radius: 8px; color: white; width: 100%; font-size: 16px; margin-bottom: 10px; cursor: pointer; font-weight: bold; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        .mode-btn { background: #444; font-size: 14px; padding: 10px; border-radius: 5px; border: 1px solid #555; color: white; cursor: pointer; }
+        .stop-btn { background: #ff5252; width: 100%; }
+        input[type=range] { width: 100%; height: 40px; margin: 15px 0; }
+        #status { padding: 10px; border-radius: 5px; background: #222; font-size: 13px; color: #00ff00; margin-bottom: 15px; }
+        #console { text-align: left; background: #000; padding: 10px; font-family: monospace; font-size: 11px; height: 80px; overflow-y: auto; border: 1px solid #333; }
     </style>
 </head>
 <body>
-    <h2>Jive Remote Control</h2>
-    <button class="btn" onclick="connect()">🔌 ПІДКЛЮЧИТИСЬ ДО JIVE</button>
-    <hr>
-    <p>Потужність вібрації (0-15):</p>
-    <input type="range" min="0" max="15" value="0" id="speedRange" oninput="updateSpeed(this.value)">
-    <div id="status">Статус: Очікування підключення...</div>
+    <h3>Magic Motion Control (CBT001)</h3>
+    <div id="status">Статус: Очікування підключення</div>
+    <button class="btn" onclick="connect()" style="width: 100%;">🔌 ПІДКЛЮЧИТИСЬ</button>
+
+    <p>Потужність (0-10):</p>
+    <input type="range" min="0" max="10" value="0" onchange="setVibe(this.value)">
+
+    <p>Толчки та Режими:</p>
+    <div class="grid">
+        <button class="mode-btn" onclick="sendMagic([0x05, 0x01])">Режим 1</button>
+        <button class="mode-btn" onclick="sendMagic([0x05, 0x02])">Режим 2 (Толчки)</button>
+        <button class="mode-btn" onclick="sendMagic([0x05, 0x03])">Режим 3 (Пульс)</button>
+        <button class="mode-btn" onclick="sendMagic([0x05, 0x04])">Режим 4 (Хвиля)</button>
+    </div>
+
+    <button class="btn stop-btn" onclick="setVibe(0)">🔴 STOP</button>
+
+    <div id="console">Логи: пристрій готовий...</div>
 
     <script>
-        let device, characteristic;
-        // Твої точні UUID зі скріншотів
+        let characteristic;
+        // UUID з твоїх скріншотів nRF Connect
         const SERVICE_UUID = '78667579-7b48-43db-b8c5-7928a6b0a335';
         const CHAR_UUID    = '78667579-a914-49a4-8333-aa3c0cd8fedc';
 
+        function log(msg) {
+            const c = document.getElementById('console');
+            c.innerHTML += "> " + msg + "<br>";
+            c.scrollTop = c.scrollHeight;
+        }
+
         async function connect() {
             try {
-                document.getElementById('status').innerText = "Шукаю пристрій CBT001...";
-                
-                device = await navigator.bluetooth.requestDevice({
+                log("Шукаю CBT001...");
+                const device = await navigator.bluetooth.requestDevice({
                     filters: [{ name: 'CBT001' }],
                     optionalServices: [SERVICE_UUID]
                 });
-
                 const server = await device.gatt.connect();
                 const service = await server.getPrimaryService(SERVICE_UUID);
                 characteristic = await service.getCharacteristic(CHAR_UUID);
-                
-                document.getElementById('status').innerText = "Статус: ПІДКЛЮЧЕНО ✅";
-                document.getElementById('status').style.color = "#4CAF50";
+                document.getElementById('status').innerText = "ПІДКЛЮЧЕНО ✅";
+                log("Успішно підключено!");
             } catch (err) {
-                document.getElementById('status').innerText = "Помилка: " + err;
-                document.getElementById('status').style.color = "#ff5252";
+                log("Помилка: " + err);
             }
         }
 
-       async function updateSpeed(val) {
-    if (!characteristic) return;
-    try {
-        let speed = parseInt(val);
-        // Спробуємо три варіанти команди (розкоментовуй по черзі, якщо перший не піде):
-        
-        // Варіант 1: Стандарт для Jive
-        let data = new Uint8Array([0x0f, speed, 0x00]); 
-        
-        // Варіант 2: Якщо варіант 1 не робить (іноді треба 0x03 на початку)
-        // let data = new Uint8Array([0x03, speed, 0x00]); 
+        async function sendMagic(bytes) {
+            if (!characteristic) return log("Немає зв'язку!");
+            try {
+                const data = new Uint8Array(bytes);
+                // Magic Motion часто працює через звичайний запис
+                await characteristic.writeValue(data);
+                log("Надіслано: " + bytes.join(', '));
+            } catch (err) {
+                log("Помилка запису: " + err);
+            }
+        }
 
-        await characteristic.writeValueWithResponse(data);
-        console.log("Відправлено швидкість: " + speed);
-    } catch (err) {
-        // Якщо помилка 'GATT operation not permitted', пробуємо без відповіді
-        const data = new Uint8Array([0x0f, parseInt(val), 0x00]);
-        await characteristic.writeValueWithoutResponse(data);
-                }
+        function setVibe(val) {
+            // Для Magic Motion команда вібрації зазвичай 0x01 + рівень
+            sendMagic([0x01, parseInt(val)]);
         }
     </script>
 </body>

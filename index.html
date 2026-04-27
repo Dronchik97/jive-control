@@ -3,31 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        body { background: #000; color: #0f0; text-align: center; font-family: monospace; padding: 20px; }
-        .panel { border: 2px solid #0f0; padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; }
+        body { background: #000; color: #fff; text-align: center; font-family: sans-serif; }
+        .panel { border: 2px solid #00ffcc; padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; margin-top: 20px; }
         .btn { padding: 15px; margin: 10px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; }
-        .conn { background: #0066ff; color: #fff; }
-        .start { background: #ffcc00; color: #000; }
-        #disp { font-size: 24px; margin: 20px; color: #fff; }
+        #disp { font-size: 20px; margin: 20px; color: #00ffcc; background: #222; padding: 10px; }
     </style>
 </head>
 <body>
     <div class="panel">
-        <h3>JIVE: PULSE MODE</h3>
+        <h3>JIVE: FINAL DECODER</h3>
         <div id="st">СТАТУС: OFF</div>
-        <button class="btn conn" onclick="conn()">🔌 1. КОННЕКТ</button>
+        <button class="btn" style="background:#0066ff; color:white" onclick="conn()">🔌 КОННЕКТ</button>
         
-        <div id="disp">Mode: Pulse Off</div>
+        <div id="disp">Пакет: [?, ?]</div>
         
-        <button class="btn start" onclick="runPulseScan()">🚀 ПУЛЬС-СКАН (1-100)</button>
-        <button class="btn" style="background:red; color:#fff" onclick="stopScan()">🛑 СТОП</button>
-        
-        <p style="font-size: 11px; color: #666;">Ігнор: 8, 10</p>
+        <button class="btn" style="background:#ff00ff; color:white" onclick="runScan(2)">🚀 СКАН КАНАЛУ 2</button>
+        <button class="btn" style="background:#00ff00; color:black" onclick="runScan(11)">🚀 СКАН КАНАЛУ 11</button>
+        <button class="btn" style="background:red; color:white" onclick="stopScan()">🛑 СТОП</button>
     </div>
 
     <script>
         let d, ch, scanner;
-        let idx = 1;
+        let val = 1;
 
         async function conn() {
             try {
@@ -37,36 +34,29 @@
                 const s = await d.gatt.connect();
                 const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
                 ch = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-                document.getElementById('st').innerText = "🟢 CONNECTED";
+                document.getElementById('st').innerText = "🟢 ПІДКЛЮЧЕНО";
             } catch (e) { alert(e); }
         }
 
-        async function runPulseScan() {
+        async function runScan(header) {
             if(!ch) return;
-            idx = 1;
+            val = 1;
             clearInterval(scanner);
-
             scanner = setInterval(async () => {
-                if(idx > 100) { stopScan(); return; }
-                if(idx === 8 || idx === 10) { idx++; return; }
+                if(val > 255) { stopScan(); return; }
+                if(val === 8 || val === 10) { val++; return; }
 
-                document.getElementById('disp').innerText = `Pulse Mode: ${idx}`;
-                
+                document.getElementById('disp').innerText = `[${header}, ${val}]`;
                 try {
-                    // Шлемо "удар" і через 100мс "стоп", щоб створити вібрацію вручну
-                    await ch.writeValueWithoutResponse(new Uint8Array([1, idx]));
-                    setTimeout(async () => {
-                        await ch.writeValueWithoutResponse(new Uint8Array([1, 0]));
-                    }, 100);
+                    await ch.writeValueWithoutResponse(new Uint8Array([header, val]));
                 } catch (e) {}
-
-                idx++;
-            }, 400); 
+                val += 10; // Швидкий крок
+            }, 300);
         }
 
         function stopScan() {
             clearInterval(scanner);
-            document.getElementById('st').innerText = "🛑 STOPPED";
+            document.getElementById('st').innerText = "🛑 ЗУПИНЕНО";
         }
     </script>
 </body>

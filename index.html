@@ -3,51 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        body { background: #000; color: #fff; text-align: center; font-family: sans-serif; }
-        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 20px; }
-        button { padding: 20px; background: #222; color: #fff; border: 1px solid #444; font-weight: bold; cursor: pointer; }
-        button:active { background: #00ff00; color: #000; }
-        .info { color: #888; font-size: 14px; margin: 10px; }
+        body { background: #000; color: #00ffcc; text-align: center; font-family: sans-serif; padding: 10px; }
+        .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; max-width: 450px; margin: auto; }
+        button { padding: 15px 5px; background: #1a1a1a; color: #00ffcc; border: 1px solid #333; cursor: pointer; font-size: 14px; }
+        button:active { background: #00ffcc; color: #000; }
+        .special { background: #0044ff; color: #fff; border-color: #fff; }
+        .log { margin-top: 15px; font-size: 12px; color: #666; }
     </style>
 </head>
 <body>
-    <h3>JIVE INDEX DECODER</h3>
-    <p>Ми знаємо: 8 = толкачки, 10 = світло S</p>
+    <h3>JIVE SCANNER: 11-30</h3>
+    <p>8=Thrust, 10=LED S. Шукаємо Vibe.</p>
     
-    <button onclick="conn()" style="background: #0066ff; width: 90%; padding: 15px;">🔌 ПІДКЛЮЧИТИСЬ</button>
+    <button onclick="conn()" class="special" style="width:100%; margin-bottom:15px; padding:15px;">🔌 ПІДКЛЮЧИТИСЬ</button>
 
     <div class="grid">
-        <button onclick="send(1)">1</button>
-        <button onclick="send(2)">2</button>
-        <button onclick="send(3)">3</button>
-        <button onclick="send(4)">4</button>
-        <button onclick="send(5)">5</button>
-        <button onclick="send(6)">6</button>
-        <button onclick="send(7)">7</button>
-        <button onclick="send(9)">9</button>
+        <!-- Наступна пачка індексів -->
         <button onclick="send(11)">11</button>
+        <button onclick="send(12)">12</button>
+        <button onclick="send(13)">13</button>
+        <button onclick="send(14)">14</button>
+        <button onclick="send(15)">15</button>
+        <button onclick="send(16)">16</button>
+        <button onclick="send(17)">17</button>
+        <button onclick="send(18)">18</button>
+        <button onclick="send(19)">19</button>
+        <button onclick="send(20)">20</button>
+        <button onclick="send(21)">21</button>
+        <button onclick="send(22)">22</button>
+        <button onclick="send(23)">23</button>
+        <button onclick="send(24)">24</button>
+        <button onclick="send(25)">25</button>
+        <button onclick="send(30)">30</button>
+        <button onclick="send(64)">64</button>
+        <button onclick="send(128)">128</button>
     </div>
 
-    <div class="info">Пробуй натиснути "9" або "1-5". Якщо зависне — ти знаєш, що робити з Bluetooth!</div>
+    <div class="log" id="l">Чекаю команду...</div>
 
     <script>
         let ch;
         async function conn() {
-            const d = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true, optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
-            });
-            const s = await d.gatt.connect();
-            const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
-            ch = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-            alert("CONNECTED");
+            try {
+                const d = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true, optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
+                });
+                const s = await d.gatt.connect();
+                const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
+                ch = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
+                document.getElementById('l').innerText = "ПІДКЛЮЧЕНО";
+            } catch (e) { alert(e); }
         }
 
         async function send(idx) {
             if(!ch) return;
-            // Пробуємо посилати індекс і середню потужність (128)
-            // Якщо вібро не заводиться, спробуємо [idx, 255]
-            await ch.writeValueWithoutResponse(new Uint8Array([1, idx, 128]));
-            console.log("Sent Mode:", idx);
+            document.getElementById('l').innerText = "Шлю індекс: " + idx;
+            // Пробуємо стандартний пакет [1, індекс]
+            await ch.writeValueWithoutResponse(new Uint8Array([1, idx]));
         }
     </script>
 </body>

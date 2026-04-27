@@ -2,107 +2,59 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
-        body { background: #121212; color: #00ff00; text-align: center; font-family: sans-serif; padding: 20px; }
-        .btn { padding: 20px; background: #6200ee; border: none; border-radius: 12px; color: white; width: 100%; font-size: 20px; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
-        .control-group { background: #1e1e1e; padding: 15px; border-radius: 15px; margin-top: 20px; border: 1px solid #333; }
-        input[type=range] { width: 100%; height: 40px; margin: 10px 0; accent-color: #00ff00; }
-        #log { font-size: 10px; color: #888; text-align: left; margin-top: 20px; height: 100px; overflow: auto; background: #000; padding: 5px; }
+        body { background: #121212; color: white; text-align: center; font-family: sans-serif; padding: 20px; }
+        .btn { padding: 15px; background: #0088cc; border: none; border-radius: 8px; color: white; width: 100%; font-size: 18px; margin-bottom: 20px; cursor: pointer; }
+        input[type=range] { width: 100%; height: 40px; margin-top: 20px; }
+        #status { margin-top: 20px; padding: 10px; border-radius: 5px; background: #222; }
     </style>
 </head>
 <body>
-    <h3>CBT001: VIBRO & THRUST</h3>
-    <button class="btn" onclick="connect()">🔌 ПІДКЛЮЧИТИ JIVE</button>
-
-    <div class="control-group">
-        <label>📳 ВІБРАЦІЯ: <span id="v1">0</span></label>
-        <input type="range" min="0" max="20" value="0" oninput="sendData(1, this.value)">
-    </div>
-
-    <div class="control-group">
-        <label>🚀 ТОЛЧКИ: <span id="v2">0</span></label>
-        <input type="range" min="0" max="20" value="0" oninput="sendData(2, this.value)">
-    </div>
-
-    <div id="log">Чекаю на команду ...</div>
+    <h2>Jive Remote Control</h2>
+    <button class="btn" onclick="connect()">🔌 ПІДКЛЮЧИТИСЬ ДО JIVE</button>
+    <hr>
+    <p>Потужність вібрації (0-15):</p>
+    <input type="range" min="0" max="15" value="0" id="speedRange" oninput="updateSpeed(this.value)">
+    <div id="status">Статус: Очікування підключення...</div>
 
     <script>
-        let characteristic;
-        // Ці UUID часто юзаються в комбінованих китайських іграшках
+        let device, characteristic;
+        // Твої точні UUID зі скріншотів
         const SERVICE_UUID = '78667579-7b48-43db-b8c5-7928a6b0a335';
-const CHAR_UUID    = '78667579-a914-49a4-8333-aa3c0cd8fedc';
+        const CHAR_UUID    = '78667579-a914-49a4-8333-aa3c0cd8fedc';
 
-async function connect() {
-    try {
-        device = await navigator.bluetooth.requestDevice({
-            filters: [{ name: 'CBT001' }],
-            optionalServices: [SERVICE_UUID]
-        });
-        const server = await device.gatt.connect();
-        const service = await server.getPrimaryService(SERVICE_UUID);
-        characteristic = await service.getCharacteristic(CHAR_UUID);
-        document.getElementById('status').innerText = "ПІДКЛЮЧЕНО ✅";
-    } catch (err) {
-        document.getElementById('status').innerText = "Помилка: " + err;
-    }
-}
-
-async function sendSpeed(val) {
-    if (!characteristic) return;
-    // Для We-Vibe Jive спробуємо стандартний байт-код: 0x0f (тип) + швидкість (0-15) + 0x00
-    const data = new Uint8Array([0x0f, parseInt(val), 0x00]);
-    
-    // Використовуємо writeValueWithResponse або writeValue, 
-    // бо деякі браузери автоматично вибирають потрібний метод
-    await characteristic.writeValue(data);
-};
+        async function connect() {
+            try {
+                document.getElementById('status').innerText = "Шукаю пристрій CBT001...";
+                
+                device = await navigator.bluetooth.requestDevice({
+                    filters: [{ name: 'CBT001' }],
+                    optionalServices: [SERVICE_UUID]
+                });
 
                 const server = await device.gatt.connect();
-                log("Підключено! Шукаю порти...");
-                
-                // Пробуємо зайти через стандартний сервіс ff00
                 const service = await server.getPrimaryService(SERVICE_UUID);
                 characteristic = await service.getCharacteristic(CHAR_UUID);
                 
-                log("✅ ПОРТ ЗНАЙДЕНО! Погнали.");
-                document.querySelector('.btn').style.background = "#4caf50";
-                document.querySelector('.btn').innerText = "ГОТОВО";
-            } catch (e) {
-                log("Помилка: " + e.message);
-                // Якщо не знайшов ff00, пробуємо через brute-force метод
-                log("Пробую інший метод...");
-                bruteForce(server);
+                document.getElementById('status').innerText = "Статус: ПІДКЛЮЧЕНО ✅";
+                document.getElementById('status').style.color = "#4CAF50";
+            } catch (err) {
+                document.getElementById('status').innerText = "Помилка: " + err;
+                document.getElementById('status').style.color = "#ff5252";
             }
         }
 
-        async function bruteForce(server) {
-            try {
-                const services = await server.getPrimaryServices();
-                for (let s of services) {
-                    let chars = await s.getCharacteristics();
-                    for (let c of chars) {
-                        if (c.properties.write || c.properties.writeWithoutResponse) {
-                            characteristic = c;
-                            log("🔥 Знайшов лівий порт: " + c.uuid);
-                            return;
-                        }
-                    }
-                }
-            } catch (err) { log("Все глухо: " + err.message); }
-        }
-
-        async function sendData(type, val) {
-            if (type === 1) document.getElementById('v1').innerText = val;
-            if (type === 2) document.getElementById('v2').innerText = val;
-            
+        async function updateSpeed(val) {
             if (!characteristic) return;
-
             try {
-                // Пакет для CBT001: [тип_функції, значення, 0, 0]
-                // Тип 1 - вібро, Тип 2 - механіка
-                const data = new Uint8Array([0x01, type, parseInt(val), 0x00]);
-                await characteristic.writeValueWithoutResponse(data);
-            } catch (e) { console.log(e); }
+                // Команда для We-Vibe: 0x0f (тип), рівень швидкості (0-15), 0x00
+                const data = new Uint8Array([0x0f, parseInt(val), 0x00]);
+                await characteristic.writeValue(data);
+            } catch (err) {
+                console.log("Помилка відправки: " + err);
+            }
         }
     </script>
 </body>

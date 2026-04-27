@@ -4,36 +4,30 @@
     <meta charset="UTF-8">
     <style>
         body { background: #000; color: #0f0; text-align: center; font-family: monospace; padding: 20px; }
-        .panel { border: 2px solid #0f0; padding: 20px; border-radius: 15px; max-width: 450px; margin: auto; }
-        .btn { padding: 15px; margin: 5px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; }
+        .panel { border: 2px solid #0f0; padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; }
+        .btn { padding: 15px; margin: 10px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; }
         .conn { background: #0066ff; color: #fff; }
-        .start { background: #ff00ff; color: #fff; }
-        .stop { background: #f00; color: #fff; }
-        #disp { font-size: 28px; margin: 20px; color: #fff; background: #222; padding: 10px; border-radius: 10px; }
-        .blacklist { color: #ff4444; font-size: 12px; }
+        .start { background: #ffcc00; color: #000; }
+        #disp { font-size: 24px; margin: 20px; color: #fff; }
     </style>
 </head>
 <body>
     <div class="panel">
-        <h3>JIVE: BLACKLIST SCANNER</h3>
+        <h3>JIVE: PULSE MODE</h3>
         <div id="st">СТАТУС: OFF</div>
         <button class="btn conn" onclick="conn()">🔌 1. КОННЕКТ</button>
         
-        <div id="disp">Header: ? | Index: ?</div>
+        <div id="disp">Mode: Pulse Off</div>
         
-        <button class="btn start" onclick="runScan(3)">🚀 СКАН HEADER 3</button>
-        <button class="btn start" onclick="runScan(4)">🚀 СКАН HEADER 4</button>
-        <button class="btn start" onclick="runScan(5)">🚀 СКАН HEADER 5</button>
+        <button class="btn start" onclick="runPulseScan()">🚀 ПУЛЬС-СКАН (1-100)</button>
+        <button class="btn" style="background:red; color:#fff" onclick="stopScan()">🛑 СТОП</button>
         
-        <button class="btn stop" onclick="stopScan()">🛑 СТОП</button>
-        
-        <p class="blacklist">⛔ ІГНОР: 8, 10 (ТОЛКАЧКИ ТА СВІТЛО)</p>
+        <p style="font-size: 11px; color: #666;">Ігнор: 8, 10</p>
     </div>
 
     <script>
-        let d, c, scanner;
+        let d, ch, scanner;
         let idx = 1;
-        const blackList = [8, 10];
 
         async function conn() {
             try {
@@ -42,39 +36,37 @@
                 });
                 const s = await d.gatt.connect();
                 const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
-                c = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-                document.getElementById('st').innerText = "🟢 ПІДКЛЮЧЕНО";
+                ch = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
+                document.getElementById('st').innerText = "🟢 CONNECTED";
             } catch (e) { alert(e); }
         }
 
-        async function runScan(header) {
-            if(!c) return;
+        async function runPulseScan() {
+            if(!ch) return;
             idx = 1;
             clearInterval(scanner);
-            document.getElementById('st').innerText = "📡 СКАНУЮ H" + header;
 
             scanner = setInterval(async () => {
-                // Пропускаємо все з чорного списку
-                while(blackList.includes(idx)) {
-                    idx++;
-                }
-
                 if(idx > 100) { stopScan(); return; }
+                if(idx === 8 || idx === 10) { idx++; return; }
 
-                document.getElementById('disp').innerText = `H: ${header} | Index: ${idx}`;
+                document.getElementById('disp').innerText = `Pulse Mode: ${idx}`;
                 
                 try {
-                    // Пробуємо коротку команду
-                    await c.writeValueWithoutResponse(new Uint8Array([header, idx]));
+                    // Шлемо "удар" і через 100мс "стоп", щоб створити вібрацію вручну
+                    await ch.writeValueWithoutResponse(new Uint8Array([1, idx]));
+                    setTimeout(async () => {
+                        await ch.writeValueWithoutResponse(new Uint8Array([1, 0]));
+                    }, 100);
                 } catch (e) {}
 
                 idx++;
-            }, 400); // 0.4 сек, щоб ти міг встигнути зупинити
+            }, 400); 
         }
 
         function stopScan() {
             clearInterval(scanner);
-            document.getElementById('st').innerText = "🛑 ЗУПИНЕНО НА " + (idx - 1);
+            document.getElementById('st').innerText = "🛑 STOPPED";
         }
     </script>
 </body>

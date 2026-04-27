@@ -2,71 +2,62 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { background: #0a0a0a; color: #eee; text-align: center; font-family: sans-serif; padding: 20px; }
-        .btn { padding: 20px; margin-bottom: 10px; border: none; border-radius: 12px; color: white; width: 100%; font-size: 18px; font-weight: bold; cursor: pointer; }
-        .connect { background: #0088cc; }
-        .vibro { background: linear-gradient(90deg, #ff00ff, #800080); }
-        .off { background: #ff5252; margin-top: 20px; }
-        #status { color: #00ffcc; font-size: 12px; margin-bottom: 20px; }
+        body { background: #0e0e0e; color: #00ffcc; text-align: center; font-family: 'Courier New', monospace; padding: 20px; }
+        .card { border: 2px solid #00ffcc; padding: 20px; border-radius: 20px; box-shadow: 0 0 20px #00ffcc33; }
+        .btn { padding: 20px; margin: 10px 0; border: none; border-radius: 12px; width: 100%; font-weight: bold; cursor: pointer; text-transform: uppercase; }
+        .conn { background: #0088cc; color: white; }
+        .fire { background: #ff00ff; color: white; font-size: 20px; animation: pulse 1s infinite; }
+        .stop { background: #333; color: #888; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
-    <div id="status">🔴 Offline</div>
-    <button class="btn connect" onclick="connect()">🔌 CONNECT</button>
-
-    <div class="card" style="background:#1a1a1a; padding:15px; border-radius:15px;">
-        <p>РЕЖИМ "МУЗИКА" (Емуляція)</p>
-        <button id="vibroBtn" class="btn vibro" onclick="toggleVibro()">START VIBRO GEN</button>
+    <div class="card">
+        <h2>JIVE HACK: MUSIC MODE</h2>
+        <div id="status" style="margin-bottom:10px;">🔴 NOT CONNECTED</div>
+        <button class="btn conn" onclick="connect()">🔌 1. З'ЄДНАТИ</button>
+        <button class="btn fire" onclick="startVibro()">🔥 2. ЗАПУСТИТИ ВІБРО</button>
+        <button class="btn stop" onclick="stopVibro()">🛑 СТОП</button>
+        <button class="btn stop" style="background:#ff5252; color:white;" onclick="kill()">🚫 ПОВНИЙ ВИКЛ</button>
     </div>
 
-    <button class="btn off" onclick="disconnect()">🚫 DISCONNECT / OFF</button>
-
     <script>
-        let dev, char, timer;
-        let isVibrating = false;
+        let device, char, loop;
 
         async function connect() {
             try {
-                dev = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true, optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
+                device = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
                 });
-                const s = await dev.gatt.connect();
-                const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
-                char = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-                document.getElementById('status').innerText = "🟢 CONNECTED";
-            } catch (e) { alert(e); }
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
+                char = await service.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
+                document.getElementById('status').innerText = "🟢 СИСТЕМА ГОТОВА";
+            } catch (e) { alert("Помилка Опери: " + e); }
         }
 
-        async function send(h, v) {
-            if (char) await char.writeValue(new Uint8Array([h, v]));
+        async function startVibro() {
+            if (!char) return;
+            // Шлемо пачки кожні 20мс — це швидкість звуку (50 Гц)
+            loop = setInterval(() => {
+                // Шлемо команду "короткий тик" без очікування відповіді
+                char.writeValueWithoutResponse(new Uint8Array([1, 1])); 
+            }, 20);
+            document.getElementById('status').innerText = "⚡ ГЕНЕРАЦІЯ ХВИЛІ...";
         }
 
-        function toggleVibro() {
-            isVibrating = !isVibrating;
-            const btn = document.getElementById('vibroBtn');
-            
-            if (isVibrating) {
-                btn.innerText = "STOP VIBRO GEN";
-                // Шлемо команду кожні 50мс (як ритм музики)
-                timer = setInterval(() => {
-                    send(1, 8); // Можеш спробувати змінити на 1, 16 або 11, 8
-                }, 50);
-            } else {
-                btn.innerText = "START VIBRO GEN";
-                clearInterval(timer);
-                send(1, 0);
-            }
+        function stopVibro() {
+            clearInterval(loop);
+            if (char) char.writeValue(new Uint8Array([1, 0]));
+            document.getElementById('status').innerText = "🟡 ПАУЗА";
         }
 
-        async function disconnect() {
-            clearInterval(timer);
-            if (dev && dev.gatt.connected) {
-                await send(1, 0);
-                await dev.gatt.disconnect();
-                document.getElementById('status').innerText = "🔴 DISCONNECTED";
-            }
+        async function kill() {
+            stopVibro();
+            if (device) await device.gatt.disconnect();
+            document.getElementById('status').innerText = "🔴 ВІДКЛЮЧЕНО";
         }
     </script>
 </body>

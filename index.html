@@ -4,51 +4,62 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { background: #121212; color: white; text-align: center; font-family: sans-serif; padding: 20px; }
-        .card { background: #222; padding: 20px; border-radius: 15px; margin-bottom: 20px; border: 1px solid #444; }
-        input[type=range] { width: 100%; margin: 20px 0; cursor: pointer; }
-        .val-display { font-size: 24px; color: #00ffcc; font-weight: bold; }
-        .btn { padding: 15px; background: #0088cc; border: none; border-radius: 10px; color: white; width: 100%; font-weight: bold; margin-bottom: 20px; }
-        .stop { background: #ff5252; }
+        body { background: #121212; color: #eee; text-align: center; font-family: sans-serif; padding: 20px; }
+        .card { background: #222; padding: 15px; border-radius: 12px; border: 1px solid #444; margin-bottom: 20px; }
+        .btn { padding: 15px; background: #0088cc; border: none; border-radius: 8px; color: white; width: 100%; font-weight: bold; margin-bottom: 10px; cursor: pointer; }
+        #status { color: #00ffcc; margin-bottom: 20px; font-size: 14px; }
+        .val { font-size: 40px; color: #efa00b; margin: 20px 0; }
+        .small-btn { width: 48%; display: inline-block; background: #444; }
     </style>
 </head>
 <body>
+    <div id="status">Статус: Треба коннект</div>
     <button class="btn" onclick="connect()">🔌 ПІДКЛЮЧИТИСЬ</button>
 
     <div class="card">
-        <p>КАНАЛ 1 (Найімовірніший)</p>
-        <input type="range" min="0" max="255" value="0" oninput="updateVibro(1, this.value, 'v1')">
-        <div class="val-display" id="v1">0</div>
+        <p>Поточне значення (Заголовок 1):</p>
+        <div class="val" id="num">0</div>
+        
+        <div style="display: flex; justify-content: space-between;">
+            <button class="btn small-btn" onclick="step(-1)">⬅️ МЕНШЕ</button>
+            <button class="btn small-btn" onclick="step(1)">БІЛЬШЕ ➡️</button>
+        </div>
+        
+        <p style="font-size: 12px; color: #888;">Клацай по одному. Шукай число, де він просто гуде, а не дьоргається.</p>
     </div>
 
-    <div class="card">
-        <p>КАНАЛ 5 (Альтернативний)</p>
-        <input type="range" min="0" max="255" value="0" oninput="updateVibro(5, this.value, 'v2')">
-        <div class="val-display" id="v2">0</div>
-    </div>
-
-    <button class="btn stop" onclick="updateVibro(1, 0, 'v1'); updateVibro(5, 0, 'v2');">🛑 СТОП</button>
+    <button class="btn" style="background: #ff5252;" onclick="send(1, 0)">🛑 СТОП (0)</button>
 
     <script>
         let char;
+        let current = 0;
+
         async function connect() {
-            const d = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true,
-                optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
-            });
-            const s = await d.gatt.connect();
-            const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
-            char = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-            alert("Зв'язок є!");
+            try {
+                const d = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
+                });
+                const s = await d.gatt.connect();
+                const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
+                char = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
+                document.getElementById('status').innerText = "ПІДКЛЮЧЕНО ✅";
+            } catch (e) { alert(e); }
         }
 
-        async function updateVibro(h, v, displayId) {
-            document.getElementById(displayId).innerText = v;
+        async function send(h, v) {
             if (!char) return;
             try {
-                // Шлемо заголовок + значення швидкості
-                await char.writeValue(new Uint8Array([h, parseInt(v)]));
+                await char.writeValue(new Uint8Array([h, v]));
+                document.getElementById('num').innerText = v;
             } catch (e) {}
+        }
+
+        function step(delta) {
+            current += delta;
+            if (current < 0) current = 255;
+            if (current > 255) current = 0;
+            send(1, current);
         }
     </script>
 </body>

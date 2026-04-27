@@ -5,45 +5,65 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body { background: #121212; color: white; text-align: center; font-family: sans-serif; padding: 20px; }
-        .btn { padding: 15px; background: #0088cc; border: none; border-radius: 8px; color: white; width: 100%; font-size: 18px; margin-bottom: 20px; }
-        input[type=range] { width: 100%; height: 30px; }
+        .btn { padding: 15px; background: #0088cc; border: none; border-radius: 8px; color: white; width: 100%; font-size: 18px; margin-bottom: 20px; cursor: pointer; }
+        input[type=range] { width: 100%; height: 40px; margin-top: 20px; }
+        #status { margin-top: 20px; color: #aaa; }
     </style>
 </head>
 <body>
-    <h2>Jive Remote Control</h2>
+    <h2>Jive Control 2.0</h2>
     <button class="btn" onclick="connect()">🔌 ПІДКЛЮЧИТИСЬ</button>
-    <hr>
-    <p>Потужність вібрації:</p>
-    <input type="range" min="0" max="15" value="0" onchange="sendSpeed(this.value)">
+    
+    <div id="controls" style="display:none;">
+        <p>Потужність (0 - 15):</p>
+        <input type="range" min="0" max="15" value="0" oninput="sendSpeed(this.value)">
+        <h1 id="valDisplay">0</h1>
+    </div>
+
     <p id="status">Статус: Очікування...</p>
 
     <script>
         let device, characteristic;
-        // UUID саме для We-Vibe
+        // UUID для We-Vibe
         const SERVICE_UUID = 'f000bb03-0451-4000-b000-000000000000';
         const CHAR_UUID    = 'f000bb03-0451-4000-b000-000000000000';
 
         async function connect() {
             try {
-                document.getElementById('status').innerText = "Шукаю Jive...";
+                if (!navigator.bluetooth) {
+                    alert("⚠️ Блютуз не підтримується цим браузером! Спробуй Chrome.");
+                    return;
+                }
+
+                document.getElementById('status').innerText = "Шукаю пристрої...";
+                
+                // ШУКАЄМО ВСІ ПРИСТРОЇ, ЩОБ НЕ ПОМИЛИТИСЬ
                 device = await navigator.bluetooth.requestDevice({
-                    filters: [{ namePrefix: 'Jive' }, { namePrefix: 'We-Vibe' }],
+                    acceptAllDevices: true,
                     optionalServices: [SERVICE_UUID]
                 });
+
                 const server = await device.gatt.connect();
                 const service = await server.getPrimaryService(SERVICE_UUID);
                 characteristic = await service.getCharacteristic(CHAR_UUID);
+                
                 document.getElementById('status').innerText = "Статус: ПІДКЛЮЧЕНО ✅";
+                document.getElementById('controls').style.display = "block";
             } catch (err) {
-                document.getElementById('status').innerText = "Помилка: " + err;
+                alert("🚨 Помилка: " + err.message);
+                document.getElementById('status').innerText = "Помилка підключення";
             }
         }
 
         async function sendSpeed(val) {
+            document.getElementById('valDisplay').innerText = val;
             if (!characteristic) return;
-            // Команда для Jive: 0x0f - тип, val - швидкість (0-15), 0x00 - заповнювач
-            const data = new Uint8Array([0x0f, parseInt(val), 0x00]);
-            await characteristic.writeValue(data);
+            try {
+                const data = new Uint8Array([0x0f, parseInt(val), 0x00]);
+                await characteristic.writeValue(data);
+            } catch (e) {
+                console.log("Помилка відправки: " + e);
+            }
         }
     </script>
 </body>

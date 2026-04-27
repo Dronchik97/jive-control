@@ -3,22 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        body { background: #000; color: #00ff00; text-align: center; font-family: sans-serif; }
-        .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; max-width: 400px; margin: auto; padding: 20px; }
-        button { padding: 15px; border: 1px solid #0f0; background: #222; color: #0f0; cursor: pointer; font-weight: bold; }
-        button:active { background: #0f0; color: #000; }
-        .conn { width: 90%; background: #0044ff; color: #fff; margin-top: 20px; }
+        body { background: #000; color: #fff; text-align: center; font-family: sans-serif; }
+        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 20px; }
+        button { padding: 20px; background: #222; color: #fff; border: 1px solid #444; font-weight: bold; cursor: pointer; }
+        button:active { background: #00ff00; color: #000; }
+        .info { color: #888; font-size: 14px; margin: 10px; }
     </style>
 </head>
 <body>
-
-    <h3>JIVE MODE SCANNER</h3>
-    <p>Шукаємо вібро по індексах. Якщо зависне — вирубай Bluetooth!</p>
-
-    <button class="conn" onclick="conn()">🔌 1. ПІДКЛЮЧИТИСЬ</button>
+    <h3>JIVE INDEX DECODER</h3>
+    <p>Ми знаємо: 8 = толкачки, 10 = світло S</p>
+    
+    <button onclick="conn()" style="background: #0066ff; width: 90%; padding: 15px;">🔌 ПІДКЛЮЧИТИСЬ</button>
 
     <div class="grid">
-        <!-- Пробуємо індекси від 1 до 12 -->
         <button onclick="send(1)">1</button>
         <button onclick="send(2)">2</button>
         <button onclick="send(3)">3</button>
@@ -26,33 +24,30 @@
         <button onclick="send(5)">5</button>
         <button onclick="send(6)">6</button>
         <button onclick="send(7)">7</button>
-        <button onclick="send(8)" style="border-color: red;">8 (Твої толкачки)</button>
         <button onclick="send(9)">9</button>
-        <button onclick="send(10)">10</button>
         <button onclick="send(11)">11</button>
-        <button onclick="send(12)">12</button>
     </div>
+
+    <div class="info">Пробуй натиснути "9" або "1-5". Якщо зависне — ти знаєш, що робити з Bluetooth!</div>
 
     <script>
         let ch;
         async function conn() {
-            try {
-                const d = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true, 
-                    optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
-                });
-                const s = await d.gatt.connect();
-                const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
-                ch = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-                alert("ГОТОВО");
-            } catch (e) { alert(e); }
+            const d = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true, optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
+            });
+            const s = await d.gatt.connect();
+            const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
+            ch = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
+            alert("CONNECTED");
         }
 
-        async function send(val) {
+        async function send(idx) {
             if(!ch) return;
-            // Шлемо заголовок 1 і номер режиму
-            await ch.writeValueWithoutResponse(new Uint8Array([1, val]));
-            console.log("Sent Mode:", val);
+            // Пробуємо посилати індекс і середню потужність (128)
+            // Якщо вібро не заводиться, спробуємо [idx, 255]
+            await ch.writeValueWithoutResponse(new Uint8Array([1, idx, 128]));
+            console.log("Sent Mode:", idx);
         }
     </script>
 </body>

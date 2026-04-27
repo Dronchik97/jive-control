@@ -4,30 +4,36 @@
     <meta charset="UTF-8">
     <style>
         body { background: #000; color: #0f0; text-align: center; font-family: monospace; padding: 20px; }
-        .panel { border: 2px solid #0f0; padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; }
-        .btn { padding: 15px; margin: 10px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; }
+        .panel { border: 2px solid #0f0; padding: 20px; border-radius: 15px; max-width: 450px; margin: auto; }
+        .btn { padding: 15px; margin: 5px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; }
         .conn { background: #0066ff; color: #fff; }
         .start { background: #ff00ff; color: #fff; }
         .stop { background: #f00; color: #fff; }
-        #disp { font-size: 24px; margin: 20px; color: #fff; }
+        #disp { font-size: 28px; margin: 20px; color: #fff; background: #222; padding: 10px; border-radius: 10px; }
+        .blacklist { color: #ff4444; font-size: 12px; }
     </style>
 </head>
 <body>
     <div class="panel">
-        <h3>JIVE: ULTIMATE BRUTEFORCER</h3>
+        <h3>JIVE: BLACKLIST SCANNER</h3>
         <div id="st">СТАТУС: OFF</div>
         <button class="btn conn" onclick="conn()">🔌 1. КОННЕКТ</button>
         
-        <div id="disp">Пакет: [?, ?]</div>
+        <div id="disp">Header: ? | Index: ?</div>
         
-        <button class="btn start" id="b3" onclick="autoScan(3)">🚀 СКАН ЗАГОЛОВКА 3</button>
-        <button class="btn start" id="b5" onclick="autoScan(5)">🚀 СКАН ЗАГОЛОВКА 5</button>
+        <button class="btn start" onclick="runScan(3)">🚀 СКАН HEADER 3</button>
+        <button class="btn start" onclick="runScan(4)">🚀 СКАН HEADER 4</button>
+        <button class="btn start" onclick="runScan(5)">🚀 СКАН HEADER 5</button>
+        
         <button class="btn stop" onclick="stopScan()">🛑 СТОП</button>
+        
+        <p class="blacklist">⛔ ІГНОР: 8, 10 (ТОЛКАЧКИ ТА СВІТЛО)</p>
     </div>
 
     <script>
         let d, c, scanner;
-        let currentIdx = 1;
+        let idx = 1;
+        const blackList = [8, 10];
 
         async function conn() {
             try {
@@ -37,30 +43,38 @@
                 const s = await d.gatt.connect();
                 const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
                 c = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-                document.getElementById('st').innerText = "🟢 CONNECTED";
+                document.getElementById('st').innerText = "🟢 ПІДКЛЮЧЕНО";
             } catch (e) { alert(e); }
         }
 
-        async function autoScan(header) {
+        async function runScan(header) {
             if(!c) return;
-            currentIdx = 1;
+            idx = 1;
+            clearInterval(scanner);
+            document.getElementById('st').innerText = "📡 СКАНУЮ H" + header;
+
             scanner = setInterval(async () => {
-                if(currentIdx > 100) { stopScan(); return; }
-                
-                document.getElementById('disp').innerText = `Пакет: [${header}, ${currentIdx}]`;
+                // Пропускаємо все з чорного списку
+                while(blackList.includes(idx)) {
+                    idx++;
+                }
+
+                if(idx > 100) { stopScan(); return; }
+
+                document.getElementById('disp').innerText = `H: ${header} | Index: ${idx}`;
                 
                 try {
-                    // Шлемо комбінацію заголовок + індекс
-                    await c.writeValueWithoutResponse(new Uint8Array([header, currentIdx]));
+                    // Пробуємо коротку команду
+                    await c.writeValueWithoutResponse(new Uint8Array([header, idx]));
                 } catch (e) {}
 
-                currentIdx++;
-            }, 300); // Швидкий перебір (0.3 сек), бо нам треба знайти хоч якийсь шорох
+                idx++;
+            }, 400); // 0.4 сек, щоб ти міг встигнути зупинити
         }
 
         function stopScan() {
             clearInterval(scanner);
-            document.getElementById('st').innerText = "🛑 ЗУПИНЕНО";
+            document.getElementById('st').innerText = "🛑 ЗУПИНЕНО НА " + (idx - 1);
         }
     </script>
 </body>

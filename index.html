@@ -2,47 +2,43 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>JIVE HACKER PRO</title>
+    <title>JIVE VIBRO FIX</title>
     <style>
-        body { background: #050505; color: #00ff00; text-align: center; font-family: 'Courier New', monospace; padding: 10px; }
-        .panel { border: 2px solid #00ff00; padding: 15px; border-radius: 15px; background: #001100; max-width: 400px; margin: auto; }
-        .btn { padding: 15px; margin: 5px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; text-transform: uppercase; }
-        .conn { background: #0044ff; color: white; box-shadow: 0 0 10px #0044ff; }
-        .mode-a { background: #ff00ff; color: white; }
-        .mode-b { background: #ffaa00; color: black; }
-        .stop { background: #aa0000; color: white; }
-        .status { font-size: 12px; margin-bottom: 10px; color: #88ff88; }
-        .group { border: 1px solid #333; padding: 10px; margin: 10px 0; border-radius: 5px; }
-        input[type=range] { width: 90%; }
+        body { background: #000; color: #0f0; text-align: center; font-family: 'Courier New', monospace; padding: 20px; }
+        .panel { border: 3px solid #0f0; padding: 20px; border-radius: 20px; background: #010; max-width: 450px; margin: auto; box-shadow: 0 0 30px #0f03; }
+        .btn { padding: 18px; margin: 8px 0; border: none; border-radius: 10px; width: 100%; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.2s; }
+        .conn { background: #0066ff; color: #fff; }
+        .turbo { background: #ff00ff; color: #fff; box-shadow: 0 0 15px #ff00ff; animation: blink 0.5s infinite; }
+        .mode { background: #555; color: #fff; }
+        .stop { background: #f00; color: #fff; margin-top: 20px; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+        .status { margin-bottom: 15px; font-size: 14px; color: #0f0; }
+        input[type=range] { width: 100%; height: 25px; margin: 15px 0; }
     </style>
 </head>
 <body>
 
 <div class="panel">
-    <h3>JIVE ULTIMATE CONTROL</h3>
+    <h2>⚡ JIVE VIBRO FIX ⚡</h2>
     <div id="st" class="status">СТАТУС: ВІДКЛЮЧЕНО</div>
     
-    <button class="btn conn" onclick="connect()">🔌 ПІДКЛЮЧИТИСЬ (Chrome/Edge)</button>
+    <button class="btn conn" onclick="connect()">🔌 1. З'ЄДНАТИ ПРИСТРІЙ</button>
 
-    <div class="group">
-        <div>ПОТУЖНІСТЬ: <span id="pV">100</span></div>
-        <input type="range" min="0" max="255" value="100" id="pwr" oninput="document.getElementById('pV').innerText=this.value">
+    <div style="border: 1px solid #333; padding: 10px; margin: 15px 0;">
+        <label>ПОТУЖНІСТЬ (зараз: <span id="pV">150</span>)</label>
+        <input type="range" min="0" max="255" value="150" id="pwr" oninput="document.getElementById('pV').innerText=this.value">
     </div>
 
-    <div class="group">
-        <small>МЕТОД "КУЛЕМЕТ" (Швидкі імпульси)</small>
-        <button class="btn mode-a" onclick="startRapid()">🔥 ЗАПУСТИТИ ПОТІК</button>
+    <button class="btn turbo" onclick="startTurbo()">🔥 ЗАПУСТИТИ TURBO VIBRO</button>
+    
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
+        <button class="btn mode" onclick="send([5, getP()])">РЕЖИМ 5</button>
+        <button class="btn mode" onclick="send([18, getP()])">РЕЖИМ 18</button>
+        <button class="btn mode" onclick="send([1, getP(), 1])">ПАКЕТ 3-БАЙТИ</button>
+        <button class="btn mode" onclick="send([1, getP(), 0, 0, 0, 0, 0, 0])">ПАКЕТ 8-БАЙТІВ</button>
     </div>
 
-    <div class="group">
-        <small>СПЕЦ-ПАКЕТИ (Шукаємо вібро-код)</small>
-        <button class="btn mode-b" onclick="sendPkg([255, 1, getP()])">ВАРІАНТ А (FF 01 XX)</button>
-        <button class="btn mode-b" onclick="sendPkg([1, 1, getP()])">ВАРІАНТ Б (01 01 XX)</button>
-        <button class="btn mode-b" onclick="sendPkg([1, getP(), getP()+1])">ВАРІАНТ В (SUM)</button>
-        <button class="btn mode-b" onclick="sendPkg([1, getP(), 0, 0, 0, 0, 0, 0])">ВАРІАНТ Г (8 BYTES)</button>
-    </div>
-
-    <button class="btn stop" onclick="stopAll()">🛑 СТОП / ВИМКНУТИ</button>
+    <button class="btn stop" onclick="stopAll()">🛑 ПОВНИЙ СТОП</button>
 </div>
 
 <script>
@@ -59,42 +55,37 @@
             const server = await device.gatt.connect();
             const service = await server.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
             char = await service.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-            document.getElementById('st').innerText = "СТАТУС: ONLINE (ЗНАЙДЕНО " + char.uuid.slice(-4) + ")";
+            document.getElementById('st').innerText = "СТАТУС: ГОТОВО ДО БОЮ";
         } catch (e) { 
             document.getElementById('st').innerText = "ПОМИЛКА: " + e.message;
         }
     }
 
-    async function sendPkg(arr) {
+    async function send(arr) {
         if (!char) return;
         try {
-            // Пробуємо записати пакет
             await char.writeValueWithoutResponse(new Uint8Array(arr));
-            console.log("Sent:", arr);
-        } catch (e) { console.log("Err:", e); }
+        } catch (e) { console.log(e); }
     }
 
-   function startVibroWave() {
-    let level = 120; // Початкова потужність
-    clearInterval(loop);
-    
-    loop = setInterval(() => {
-        if (!char) return;
-        
-        // Створюємо "хитання" потужності (синусоїду)
-        // Це змушує мотор не зупинятися, бо сигнал весь час різний
-        let wave = level + Math.floor(Math.random() * 20); 
-        
-        // Шлемо заголовок 1 (мотор) і наше динамічне значення
-        char.writeValueWithoutResponse(new Uint8Array([1, wave]));
-        
-    }, 15); // Дуже висока швидкість - 15 мілісекунд
-}
-    
+    function startTurbo() {
+        stopAll();
+        document.getElementById('st').innerText = "СТАТУС: TURBO ACTIVE";
+        // Лупимо кожні 10мс. Це має злити "толкачки" в один гул
+        loop = setInterval(() => {
+            if(char) {
+                // Шлемо випадкове мікро-коригування, щоб контролер не ігнорував однакові команди
+                let val = getP();
+                let drift = val + (Math.random() > 0.5 ? 1 : -1);
+                char.writeValueWithoutResponse(new Uint8Array([1, drift]));
+            }
+        }, 10); 
+    }
+
     function stopAll() {
         clearInterval(loop);
-        if(char) char.writeValue(new Uint8Array([1, 0]));
-        document.getElementById('st').innerText = "СТАТУС: ПАУЗА / СТОП";
+        if(char) char.writeValueWithoutResponse(new Uint8Array([1, 0]));
+        document.getElementById('st').innerText = "СТАТУС: ПАУЗА";
     }
 </script>
 

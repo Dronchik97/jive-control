@@ -2,92 +2,78 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>JIVE VIBRO FIX</title>
     <style>
-        body { background: #000; color: #0f0; text-align: center; font-family: 'Courier New', monospace; padding: 20px; }
-        .panel { border: 3px solid #0f0; padding: 20px; border-radius: 20px; background: #010; max-width: 450px; margin: auto; box-shadow: 0 0 30px #0f03; }
-        .btn { padding: 18px; margin: 8px 0; border: none; border-radius: 10px; width: 100%; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.2s; }
-        .conn { background: #0066ff; color: #fff; }
-        .turbo { background: #ff00ff; color: #fff; box-shadow: 0 0 15px #ff00ff; animation: blink 0.5s infinite; }
-        .mode { background: #555; color: #fff; }
-        .stop { background: #f00; color: #fff; margin-top: 20px; }
-        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
-        .status { margin-bottom: 15px; font-size: 14px; color: #0f0; }
-        input[type=range] { width: 100%; height: 25px; margin: 15px 0; }
+        body { background: #000; color: #00ffcc; text-align: center; font-family: sans-serif; padding: 20px; }
+        .panel { border: 2px solid #00ffcc; padding: 20px; border-radius: 15px; background: #0a0a0a; max-width: 400px; margin: auto; }
+        .btn { padding: 15px; margin: 5px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; }
+        .c { background: #0088cc; color: #fff; }
+        .vibe { background: #ff00ff; color: #fff; }
+        .stop { background: #cc0000; color: #fff; }
+        .slider-group { margin: 20px 0; border: 1px solid #333; padding: 10px; border-radius: 10px; }
+        input[type=range] { width: 100%; height: 30px; }
     </style>
 </head>
 <body>
+    <div class="panel">
+        <h3>JIVE: THRUST vs VIBE</h3>
+        <div id="st">🔴 OFF</div>
+        <button class="btn c" onclick="conn()">🔌 1. ПІДКЛЮЧИТИСЬ</button>
 
-<div class="panel">
-    <h2>⚡ JIVE VIBRO FIX ⚡</h2>
-    <div id="st" class="status">СТАТУС: ВІДКЛЮЧЕНО</div>
-    
-    <button class="btn conn" onclick="connect()">🔌 1. З'ЄДНАТИ ПРИСТРІЙ</button>
+        <div class="slider-group">
+            <label>ВІБРО (Шукаємо тут): <span id="vV">0</span></label>
+            <input type="range" min="0" max="255" value="0" id="vS" oninput="update()">
+        </div>
 
-    <div style="border: 1px solid #333; padding: 10px; margin: 15px 0;">
-        <label>ПОТУЖНІСТЬ (зараз: <span id="pV">150</span>)</label>
-        <input type="range" min="0" max="255" value="150" id="pwr" oninput="document.getElementById('pV').innerText=this.value">
+        <div class="slider-group">
+            <label>ТОЛКАЧКИ (Твій рух): <span id="tV">0</span></label>
+            <input type="range" min="0" max="255" value="0" id="tS" oninput="update()">
+        </div>
+
+        <button class="btn vibe" onclick="tryVibeOnly()">🔥 ТІЛЬКИ ВІБРО (ТЕСТ)</button>
+        <button class="btn stop" onclick="stop()">🛑 ВСЕ ВИМКНУТИ</button>
     </div>
 
-    <button class="btn turbo" onclick="startTurbo()">🔥 ЗАПУСТИТИ TURBO VIBRO</button>
-    
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px;">
-        <button class="btn mode" onclick="send([5, getP()])">РЕЖИМ 5</button>
-        <button class="btn mode" onclick="send([18, getP()])">РЕЖИМ 18</button>
-        <button class="btn mode" onclick="send([1, getP(), 1])">ПАКЕТ 3-БАЙТИ</button>
-        <button class="btn mode" onclick="send([1, getP(), 0, 0, 0, 0, 0, 0])">ПАКЕТ 8-БАЙТІВ</button>
-    </div>
-
-    <button class="btn stop" onclick="stopAll()">🛑 ПОВНИЙ СТОП</button>
-</div>
-
-<script>
-    let device, char, loop;
-
-    function getP() { return parseInt(document.getElementById('pwr').value); }
-
-    async function connect() {
-        try {
-            device = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true,
-                optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
-            });
-            const server = await device.gatt.connect();
-            const service = await server.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
-            char = await service.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-            document.getElementById('st').innerText = "СТАТУС: ГОТОВО ДО БОЮ";
-        } catch (e) { 
-            document.getElementById('st').innerText = "ПОМИЛКА: " + e.message;
+    <script>
+        let d, c;
+        const vS = document.getElementById('vS'), tS = document.getElementById('tS');
+        
+        async function conn() {
+            try {
+                d = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true, optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
+                });
+                const s = await d.gatt.connect();
+                const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
+                c = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
+                document.getElementById('st').innerText = "🟢 READY";
+            } catch (e) { alert(e); }
         }
-    }
 
-    async function send(arr) {
-        if (!char) return;
-        try {
-            await char.writeValueWithoutResponse(new Uint8Array(arr));
-        } catch (e) { console.log(e); }
-    }
+        function update() {
+            document.getElementById('vV').innerText = vS.value;
+            document.getElementById('tV').innerText = tS.value;
+            // Спроба №1: Пакет, де 2-й байт - вібро, 3-й - толкачки
+            send([1, parseInt(vS.value), parseInt(tS.value)]);
+        }
 
-    function startTurbo() {
-        stopAll();
-        document.getElementById('st').innerText = "СТАТУС: TURBO ACTIVE";
-        // Лупимо кожні 10мс. Це має злити "толкачки" в один гул
-        loop = setInterval(() => {
-            if(char) {
-                // Шлемо випадкове мікро-коригування, щоб контролер не ігнорував однакові команди
-                let val = getP();
-                let drift = val + (Math.random() > 0.5 ? 1 : -1);
-                char.writeValueWithoutResponse(new Uint8Array([1, drift]));
+        async function tryVibeOnly() {
+            // Спроба №2: У багатьох Thrust-моделях вібро включається кодом 2
+            send([2, 150]); 
+        }
+
+        async function send(arr) {
+            if (!c) return;
+            try {
+                await c.writeValueWithoutResponse(new Uint8Array(arr));
+            } catch (e) {}
+        }
+
+        function stop() {
+            if(c) {
+                send([1, 0, 0]);
+                send([2, 0]);
             }
-        }, 10); 
-    }
-
-    function stopAll() {
-        clearInterval(loop);
-        if(char) char.writeValueWithoutResponse(new Uint8Array([1, 0]));
-        document.getElementById('st').innerText = "СТАТУС: ПАУЗА";
-    }
-</script>
-
+        }
+    </script>
 </body>
 </html>

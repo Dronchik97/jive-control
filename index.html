@@ -4,77 +4,63 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { background: #0f0f0f; color: #eee; text-align: center; font-family: sans-serif; padding: 15px; }
-        .card { background: #1a1a1a; padding: 20px; border-radius: 15px; border: 1px solid #333; margin-bottom: 15px; }
+        body { background: #0a0a0a; color: #eee; text-align: center; font-family: sans-serif; padding: 20px; }
+        .card { background: #1a1a1a; padding: 20px; border-radius: 15px; border: 1px solid #333; margin-bottom: 20px; }
         .btn { padding: 15px; background: #0088cc; border: none; border-radius: 10px; color: white; width: 100%; font-weight: bold; cursor: pointer; margin-bottom: 10px; }
-        .val { font-size: 45px; color: #00ffcc; margin: 10px 0; font-family: monospace; }
-        .step-btn { flex: 1; padding: 20px; background: #333; color: white; border: 1px solid #444; border-radius: 10px; font-size: 24px; cursor: pointer; }
-        .disconnect { background: #ff5252; text-transform: uppercase; margin-top: 20px; }
-        .status { font-size: 13px; color: #888; margin-bottom: 15px; }
+        .off-btn { background: #ff5252; text-transform: uppercase; margin-top: 10px; }
+        .status { font-size: 13px; color: #00ffcc; margin-bottom: 20px; }
+        .test-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
     </style>
 </head>
 <body>
-    <div id="status" class="status">🔌 Треба коннект</div>
-    <button class="btn" onclick="connect()">ПІДКЛЮЧИТИСЬ</button>
+    <div id="status" class="status">🔌 Очікування...</div>
+    <button class="btn" onclick="connect()">З'ЄДНАТИСЬ З НОУТА</button>
 
     <div class="card">
-        <p>Шукаємо вібро на <b>Заголовку 5</b></p>
-        <div class="val" id="numDisplay">0</div>
-        
-        <div style="display: flex; gap: 10px;">
-            <button class="step-btn" onclick="changeValue(-1)">⬅️</button>
-            <button class="step-btn" onclick="changeValue(1)">➡️</button>
+        <p>Тест довгих команд (3 байти):</p>
+        <div class="test-row">
+            <button class="btn" style="background:#444" onclick="send([1, 1, 50])">1, 1, 50</button>
+            <button class="btn" style="background:#444" onclick="send([1, 1, 255])">1, 1, 255</button>
         </div>
-        <p style="font-size: 11px; color: #888; margin-top: 10px;">(Тут теж стоїть фільтр на біт 8)</p>
+        <p>Тест спец-заголовків:</p>
+        <div class="test-row">
+            <button class="btn" style="background:#666" onclick="send([0, 100])">0, 100</button>
+            <button class="btn" style="background:#666" onclick="send([255, 100])">255, 100</button>
+        </div>
     </div>
 
-    <button class="btn" style="background: #444;" onclick="send(1, 0)">ПРОСТО СТОП (0,0)</button>
-    <button class="btn disconnect" onclick="disconnectDevice()">🚫 ВІДКЛЮЧИТИСЬ (OFF)</button>
+    <button class="btn off-btn" onclick="killSwitch()">🛑 ВИМКНУТИ ТА ВІДКЛЮЧИТИСЬ</button>
 
     <script>
         let device, char;
-        let currentVal = 0;
+        const UUID_S = '78667579-7b48-43db-b8c5-7928a6b0a335';
+        const UUID_C = '78667579-a914-49a4-8333-aa3c0cd8fedc';
 
         async function connect() {
             try {
                 device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
+                    acceptAllDevices: true, optionalServices: [UUID_S]
                 });
                 const s = await device.gatt.connect();
-                const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
-                char = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-                document.getElementById('status').innerText = "ПІДКЛЮЧЕНО ДО " + device.name;
-            } catch (e) { alert("Помилка: " + e); }
+                const sv = await s.getPrimaryService(UUID_S);
+                char = await sv.getCharacteristic(UUID_C);
+                document.getElementById('status').innerText = "ОНЛАЙН: " + device.name;
+            } catch (e) { alert(e); }
         }
 
-        async function send(h, v) {
+        async function send(arr) {
             if (!char) return;
-            try {
-                await char.writeValue(new Uint8Array([h, v]));
-                document.getElementById('numDisplay').innerText = v;
-            } catch (e) { console.log("Збій відправки"); }
+            try { await char.writeValue(new Uint8Array(arr)); } catch (e) { console.log("Помилка"); }
         }
 
-        function changeValue(delta) {
-            let next = currentVal + delta;
-            while (next >= 0 && next <= 255 && (next & 8)) {
-                next += delta; 
-            }
-            if (next < 0) next = 0;
-            if (next > 255) next = 255;
-            currentVal = next;
-            // ТЕПЕР ШЛЕМО НА ЗАГОЛОВОК 5
-            send(5, currentVal); 
-        }
-
-        async function disconnectDevice() {
+        async function killSwitch() {
             if (device && device.gatt.connected) {
-                await send(1, 0); // Пробуємо спочатку вимкнути мотори
+                // Шлемо стоп-команди, які ми вже знаємо
+                await send([1, 0]);
+                await send([2, 8]);
+                // Рвемо зв'язок
                 await device.gatt.disconnect();
-                document.getElementById('status').innerText = "❌ ВІДКЛЮЧЕНО";
-                document.getElementById('numDisplay').innerText = "0";
-                currentVal = 0;
+                document.getElementById('status').innerText = "ЗВ'ЯЗОК РОЗІРВАНО 🚫";
             }
         }
     </script>

@@ -3,29 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        body { background: #050505; color: #00ff00; text-align: center; font-family: monospace; padding: 20px; }
-        .panel { border: 2px solid #00ff00; padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; }
-        .btn { padding: 15px; margin: 10px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; background: #0044ff; color: white; }
-        .stop { background: #aa0000; }
+        body { background: #000; color: #0f0; text-align: center; font-family: sans-serif; padding: 20px; }
+        .panel { border: 2px solid #0f0; padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; }
+        .btn { padding: 15px; margin: 10px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; background: #333; color: white; }
+        .vibe { background: #ff00ff; }
         input[type=range] { width: 100%; height: 30px; }
     </style>
 </head>
 <body>
     <div class="panel">
-        <h3>JIVE: CHECKSUM MODE</h3>
+        <h3>JIVE: VIBRO ONLY MODE</h3>
         <div id="st">СТАТУС: OFF</div>
-        <button class="btn" onclick="conn()">🔌 1. КОННЕКТ</button>
+        <button class="btn" style="background:#0066ff" onclick="conn()">🔌 1. КОННЕКТ</button>
 
         <div style="margin: 20px 0;">
-            <label>ПОТУЖНІСТЬ: <span id="pV">150</span></label>
-            <input type="range" min="0" max="255" value="150" id="pwr" oninput="document.getElementById('pV').innerText=this.value; sendVibe();">
+            <label>ШУКАЄМО ВІБРО: <span id="pV">100</span></label>
+            <input type="range" min="0" max="255" value="100" id="pwr">
         </div>
 
-        <button class="btn stop" onclick="fullStop()">🛑 СТОП</button>
+        <!-- Пробуємо канали, які зазвичай ідуть суто на вібро -->
+        <button class="btn vibe" onclick="send([11, getV()])">ВІБРО (Канал 11)</button>
+        <button class="btn vibe" onclick="send([16, getV()])">ВІБРО (Канал 16)</button>
+        <button class="btn vibe" onclick="send([4, getV()])">ВІБРО (Канал 4)</button>
+        <button class="btn vibe" onclick="send([1, 0, getV()])">ВІБРО (3-байт: 0, X)</button>
+
+        <button class="btn" style="background:red" onclick="send([1, 0])">🛑 СТОП</button>
     </div>
 
     <script>
         let d, c;
+        const getV = () => parseInt(document.getElementById('pwr').value);
 
         async function conn() {
             try {
@@ -35,28 +42,13 @@
                 const s = await d.gatt.connect();
                 const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
                 c = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-                document.getElementById('st').innerText = "🟢 CONNECTED";
+                document.getElementById('st').innerText = "🟢 ГОТОВО";
             } catch (e) { alert(e); }
         }
 
-        async function sendVibe() {
+        async function send(arr) {
             if (!c) return;
-            let val = parseInt(document.getElementById('pwr').value);
-            
-            // Формуємо пакет: [Заголовок, Значення, Сума]
-            // Багато китайських Thrusting девайсів працюють саме так
-            let header = 1; 
-            let checksum = (header + val) & 0xFF; 
-            let packet = new Uint8Array([header, val, checksum]);
-
-            try {
-                await c.writeValueWithoutResponse(packet);
-                console.log("Sent with checksum:", packet);
-            } catch (e) {}
-        }
-
-        async function fullStop() {
-            if(c) await c.writeValueWithoutResponse(new Uint8Array([1, 0, 1]));
+            try { await c.writeValueWithoutResponse(new Uint8Array(arr)); } catch (e) {}
         }
     </script>
 </body>

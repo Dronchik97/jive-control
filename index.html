@@ -3,61 +3,69 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        body { background: #0e0e0e; color: #00ffcc; text-align: center; font-family: 'Courier New', monospace; padding: 20px; }
-        .card { border: 2px solid #00ffcc; padding: 20px; border-radius: 20px; box-shadow: 0 0 20px #00ffcc33; }
-        .btn { padding: 20px; margin: 10px 0; border: none; border-radius: 12px; width: 100%; font-weight: bold; cursor: pointer; text-transform: uppercase; }
-        .conn { background: #0088cc; color: white; }
-        .fire { background: #ff00ff; color: white; font-size: 20px; animation: pulse 1s infinite; }
-        .stop { background: #333; color: #888; }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+        body { background: #050505; color: #00ff00; text-align: center; font-family: monospace; padding: 20px; }
+        .box { border: 2px dashed #00ff00; padding: 20px; border-radius: 10px; background: #001100; }
+        .btn { padding: 15px; margin: 5px; border: none; border-radius: 5px; width: 100%; cursor: pointer; font-weight: bold; }
+        .conn { background: #0044ff; color: white; }
+        .send { background: #00ff00; color: black; }
+        .off { background: #aa0000; color: white; }
+        input[type=range] { width: 100%; margin: 20px 0; }
+        .label { font-size: 20px; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h2>JIVE HACK: MUSIC MODE</h2>
-        <div id="status" style="margin-bottom:10px;">🔴 NOT CONNECTED</div>
-        <button class="btn conn" onclick="connect()">🔌 1. З'ЄДНАТИ</button>
-        <button class="btn fire" onclick="startVibro()">🔥 2. ЗАПУСТИТИ ВІБРО</button>
-        <button class="btn stop" onclick="stopVibro()">🛑 СТОП</button>
-        <button class="btn stop" style="background:#ff5252; color:white;" onclick="kill()">🚫 ПОВНИЙ ВИКЛ</button>
+    <div class="box">
+        <h3>JIVE DEEP SCANNER</h3>
+        <div id="st">Статус: ВІДКЛЮЧЕНО</div>
+        <button class="btn conn" onclick="cn()">1. ПІДКЛЮЧИТИСЬ</button>
+        
+        <hr>
+        
+        <div class="label">ЗАГОЛОВОК (Byte 1): <span id="hV">1</span></div>
+        <input type="range" min="0" max="20" value="1" id="hS" oninput="update()">
+        
+        <div class="label">ЗНАЧЕННЯ (Byte 2): <span id="vV">0</span></div>
+        <input type="range" min="0" max="255" value="0" id="vS" oninput="update()">
+
+        <button class="btn send" onclick="sd()">ВІДПРАВИТИ КОМАНДУ</button>
+        <button class="btn off" onclick="kill()">🚫 ВІДКЛЮЧИТИСЬ</button>
     </div>
 
     <script>
-        let device, char, loop;
+        let d, c;
+        function update() {
+            document.getElementById('hV').innerText = document.getElementById('hS').value;
+            document.getElementById('vV').innerText = document.getElementById('vS').value;
+            // Відправляємо відразу при русі повзунка для швидкості
+            sd(); 
+        }
 
-        async function connect() {
+        async function cn() {
             try {
-                device = await navigator.bluetooth.requestDevice({
+                d = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
                     optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
                 });
-                const server = await device.gatt.connect();
-                const service = await server.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
-                char = await service.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-                document.getElementById('status').innerText = "🟢 СИСТЕМА ГОТОВА";
-            } catch (e) { alert("Помилка Опери: " + e); }
+                const s = await d.gatt.connect();
+                const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
+                c = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
+                document.getElementById('st').innerText = "Статус: ГОТОВО";
+            } catch (e) { alert(e); }
         }
 
-        async function startVibro() {
-            if (!char) return;
-            // Шлемо пачки кожні 20мс — це швидкість звуку (50 Гц)
-            loop = setInterval(() => {
-                // Шлемо команду "короткий тик" без очікування відповіді
-                char.writeValueWithoutResponse(new Uint8Array([1, 1])); 
-            }, 20);
-            document.getElementById('status').innerText = "⚡ ГЕНЕРАЦІЯ ХВИЛІ...";
-        }
-
-        function stopVibro() {
-            clearInterval(loop);
-            if (char) char.writeValue(new Uint8Array([1, 0]));
-            document.getElementById('status').innerText = "🟡 ПАУЗА";
+        async function sd() {
+            if (!c) return;
+            let h = parseInt(document.getElementById('hS').value);
+            let v = parseInt(document.getElementById('vS').value);
+            try {
+                // Шлемо стандартну пачку з 2 байт
+                await c.writeValueWithoutResponse(new Uint8Array([h, v]));
+            } catch (e) {}
         }
 
         async function kill() {
-            stopVibro();
-            if (device) await device.gatt.disconnect();
-            document.getElementById('status').innerText = "🔴 ВІДКЛЮЧЕНО";
+            if (d) await d.gatt.disconnect();
+            document.getElementById('st').innerText = "Статус: ВІДКЛЮЧЕНО";
         }
     </script>
 </body>

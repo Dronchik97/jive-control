@@ -74,14 +74,23 @@
         } catch (e) { console.log("Err:", e); }
     }
 
-    function startRapid() {
-        stopAll();
-        document.getElementById('st').innerText = "СТАТУС: ПОТІК АКТИВНИЙ";
-        loop = setInterval(() => {
-            if(char) char.writeValueWithoutResponse(new Uint8Array([1, getP()]));
-        }, 30); // 30мс — імітація біта музики
-    }
-
+   function startVibroWave() {
+    let level = 120; // Початкова потужність
+    clearInterval(loop);
+    
+    loop = setInterval(() => {
+        if (!char) return;
+        
+        // Створюємо "хитання" потужності (синусоїду)
+        // Це змушує мотор не зупинятися, бо сигнал весь час різний
+        let wave = level + Math.floor(Math.random() * 20); 
+        
+        // Шлемо заголовок 1 (мотор) і наше динамічне значення
+        char.writeValueWithoutResponse(new Uint8Array([1, wave]));
+        
+    }, 15); // Дуже висока швидкість - 15 мілісекунд
+}
+    
     function stopAll() {
         clearInterval(loop);
         if(char) char.writeValue(new Uint8Array([1, 0]));

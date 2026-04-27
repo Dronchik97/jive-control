@@ -5,64 +5,59 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         body { background: #121212; color: white; text-align: center; font-family: sans-serif; padding: 20px; }
-        .btn { padding: 15px; background: #0088cc; border: none; border-radius: 8px; color: white; width: 100%; font-size: 18px; margin-bottom: 20px; cursor: pointer; }
-        input[type=range] { width: 100%; height: 40px; margin-top: 20px; }
-        #status { margin-top: 20px; color: #aaa; }
+        .btn { padding: 15px; background: #9c27b0; border: none; border-radius: 8px; color: white; width: 100%; font-size: 18px; margin-bottom: 20px; cursor: pointer; }
+        input[type=range] { width: 100%; height: 50px; }
+        #status { color: #00e5ff; margin-top: 20px; font-weight: bold; }
     </style>
 </head>
 <body>
-    <h2>Jive Control 2.0</h2>
-    <button class="btn" onclick="connect()">🔌 ПІДКЛЮЧИТИСЬ</button>
-    
-    <div id="controls" style="display:none;">
-        <p>Потужність (0 - 15):</p>
-        <input type="range" min="0" max="15" value="0" oninput="sendSpeed(this.value)">
-        <h1 id="valDisplay">0</h1>
-    </div>
-
-    <p id="status">Статус: Очікування...</p>
+    <h2>Funtown Jive Control</h2>
+    <button class="btn" onclick="connect()">🔗 ПОШУК JIVE</button>
+    <br>
+    <p>Потужність (0 - 100%):</p>
+    <input type="range" min="0" max="100" value="0" oninput="sendSpeed(this.value)">
+    <h1 id="speedVal">0%</h1>
+    <p id="status">Натисніть кнопку для пошуку...</p>
 
     <script>
-        let device, characteristic;
-        // UUID для We-Vibe
-        const SERVICE_UUID = 'f000bb03-0451-4000-b000-000000000000';
-        const CHAR_UUID    = 'f000bb03-0451-4000-b000-000000000000';
+        let characteristic;
+        // Стандартні UUID для китайських девайсів типу Funtown/MagicMotion
+        const SERVICE_UUID = '0000ff10-0000-1000-8000-00805f9b34fb';
+        const CHAR_UUID    = '0000ff11-0000-1000-8000-00805f9b34fb';
 
         async function connect() {
             try {
-                if (!navigator.bluetooth) {
-                    alert("⚠️ Блютуз не підтримується цим браузером! Спробуй Chrome.");
-                    return;
-                }
-
-                document.getElementById('status').innerText = "Шукаю пристрої...";
-                
-                // ШУКАЄМО ВСІ ПРИСТРОЇ, ЩОБ НЕ ПОМИЛИТИСЬ
+                document.getElementById('status').innerText = "Шукаю...";
+                // Шукаємо за назвою "Jive" або просто дозволяємо вибрати будь-який пристрій зі списку
                 device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
+                    filters: [
+                        { namePrefix: 'Funtown' },
+                        { namePrefix: 'Jive' }
+                    ],
                     optionalServices: [SERVICE_UUID]
                 });
 
                 const server = await device.gatt.connect();
                 const service = await server.getPrimaryService(SERVICE_UUID);
                 characteristic = await service.getCharacteristic(CHAR_UUID);
-                
-                document.getElementById('status').innerText = "Статус: ПІДКЛЮЧЕНО ✅";
-                document.getElementById('controls').style.display = "block";
-            } catch (err) {
-                alert("🚨 Помилка: " + err.message);
-                document.getElementById('status').innerText = "Помилка підключення";
+                document.getElementById('status').innerText = "ЗВ'ЯЗОК Є! ✅";
+            } catch (e) {
+                alert("Помилка підключення: " + e);
+                document.getElementById('status').innerText = "Не вдалося підключитись";
             }
         }
 
         async function sendSpeed(val) {
-            document.getElementById('valDisplay').innerText = val;
+            document.getElementById('speedVal').innerText = val + "%";
             if (!characteristic) return;
+            
             try {
-                const data = new Uint8Array([0x0f, parseInt(val), 0x00]);
+                // Команда для Funtown Jive зазвичай 0x0b або 0x01
+                // Пробуємо стандартний варіант: 0x0b + швидкість
+                const data = new Uint8Array([0x0b, parseInt(val), 0x00, 0x00, 0x00]);
                 await characteristic.writeValue(data);
             } catch (e) {
-                console.log("Помилка відправки: " + e);
+                console.log("Помилка передачі: " + e);
             }
         }
     </script>

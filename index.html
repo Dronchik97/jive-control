@@ -5,32 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { background: #121212; color: white; text-align: center; font-family: sans-serif; padding: 15px; }
-        .btn { padding: 15px; background: #0088cc; border: none; border-radius: 8px; color: white; width: 100%; font-size: 16px; margin-bottom: 10px; cursor: pointer; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-        .mode-btn { background: #444; font-size: 13px; padding: 10px; border-radius: 5px; color: white; }
+        .btn { padding: 15px; background: #0088cc; border: none; border-radius: 8px; color: white; width: 100%; font-size: 16px; margin-bottom: 10px; cursor: pointer; font-weight: bold; }
+        .mode-btn { padding: 20px; background: #2c2c2c; border: 2px solid #444; border-radius: 12px; color: white; font-size: 14px; cursor: pointer; }
+        .mode-btn:active { background: #444; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 20px 0; }
+        .stop-btn { background: #ff5252; margin-top: 20px; }
         #status { padding: 10px; border-radius: 5px; background: #222; font-size: 13px; color: #00ff00; margin-bottom: 15px; }
     </style>
 </head>
 <body>
-    <h3>Magic Motion: Фінальний Тест</h3>
+    <h3>Magic Motion: Jive Pro Control</h3>
     <div id="status">Статус: Готовий</div>
     <button class="btn" onclick="connect()">🔌 ПІДКЛЮЧИТИСЬ</button>
 
-    <p>Твоя робоча команда:</p>
-    <button class="btn" style="background: #4CAF50" onclick="sendMagic([0x01, 0x08])">✅ ТОЛЧКИ (1, 8)</button>
-
-    <hr>
-    <p>Спробуй ці (можливо, це вібро):</p>
     <div class="grid">
-        <button class="mode-btn" onclick="sendMagic([0x01, 0x09])">Cmd: 1, 9</button>
-        <button class="mode-btn" onclick="sendMagic([0x01, 0x0B])">Cmd: 1, 11</button>
-        <button class="mode-btn" onclick="sendMagic([0x01, 0x0D])">Cmd: 1, 13</button>
-        <button class="mode-btn" onclick="sendMagic([0x01, 0xFF])">Cmd: 1, 255</button>
-        <button class="mode-btn" onclick="sendMagic([0x0B, 0x08])">Cmd: 11, 8</button>
-        <button class="mode-btn" onclick="sendMagic([0x08, 0x01])">Cmd: 8, 1</button>
+        <!-- Твої розгадані команди -->
+        <button class="mode-btn" onclick="sendMagic([0x0B, 0x08])">🚤 МАЛА ШВИДКІСТЬ<br>(11, 8)</button>
+        <button class="mode-btn" onclick="sendMagic([0x01, 0x08])">📉 СЕРЕДНІ ТОЛЧКИ<br>(1, 8)</button>
+        
+        <!-- Гіпотези на основі твоїх тестів -->
+        <button class="mode-btn" onclick="sendMagic([0x0B, 0x0A])">🚀 МАКС ШВИДКІСТЬ<br>(11, 10)</button>
+        <button class="mode-btn" onclick="sendMagic([0x01, 0x0A])">📈 СИЛЬНІ ТОЛЧКИ<br>(1, 10)</button>
     </div>
 
-    <button class="btn" style="background:#ff5252" onclick="sendMagic([0x01, 0x00])">🔴 СТОП</button>
+    <button class="btn stop-btn" onclick="sendMagic([0x01, 0x00])">🔴 ПОВНА ЗУПИНКА</button>
 
     <script>
         let characteristic;
@@ -47,14 +45,14 @@
                 const service = await server.getPrimaryService(SERVICE_UUID);
                 characteristic = await service.getCharacteristic(CHAR_UUID);
                 document.getElementById('status').innerText = "ПІДКЛЮЧЕНО ✅";
-            } catch (err) { alert(err); }
+            } catch (err) { alert("Помилка: " + err); }
         }
 
         async function sendMagic(bytes) {
             if (!characteristic) return;
             try {
                 await characteristic.writeValue(new Uint8Array(bytes));
-            } catch (err) { console.log(err); }
+            } catch (err) { console.log("Помилка відправки"); }
         }
     </script>
 </body>

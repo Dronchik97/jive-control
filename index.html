@@ -64,9 +64,7 @@
         // Якщо помилка 'GATT operation not permitted', пробуємо без відповіді
         const data = new Uint8Array([0x0f, parseInt(val), 0x00]);
         await characteristic.writeValueWithoutResponse(data);
-    }
-}
-            }
+                }
         }
     </script>
 </body>

@@ -4,58 +4,43 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { background: #121212; color: white; text-align: center; font-family: sans-serif; padding: 10px; }
-        .card { background: #222; padding: 15px; border-radius: 12px; margin-bottom: 10px; border: 1px solid #333; }
+        body { background: #121212; color: white; text-align: center; font-family: sans-serif; padding: 15px; }
+        .card { background: #222; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #333; }
         .btn { padding: 15px; background: #0088cc; border: none; border-radius: 8px; color: white; width: 100%; font-size: 16px; margin-bottom: 10px; cursor: pointer; font-weight: bold; }
-        .stop-btn { background: #ff5252; height: 60px; font-size: 18px; }
-        .test-btn { background: #444; font-size: 14px; padding: 10px; border-radius: 5px; color: white; border: 1px solid #555; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-top: 10px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .mode-btn { background: #333; border: 1px solid #555; padding: 15px; color: white; border-radius: 8px; font-size: 14px; }
+        .mode-btn:active { background: #555; }
         #status { padding: 10px; border-radius: 5px; background: #222; font-size: 13px; color: #00ff00; margin-bottom: 10px; }
-        #console { text-align: left; background: #000; padding: 10px; font-family: monospace; font-size: 11px; height: 100px; overflow-y: auto; border: 1px solid #444; }
+        .current-cmd { font-size: 20px; color: #efa00b; margin: 10px 0; }
     </style>
 </head>
 <body>
     <div id="status">Статус: Готовий</div>
     <button class="btn" onclick="connect()">🔌 ПІДКЛЮЧИТИСЬ</button>
 
+    <div class="current-cmd" id="lastCmd">Остання: ---</div>
+
     <div class="card">
-        <p>Перевірка значень для заголовка <b>0x01</b> (Середні/Сильні):</p>
+        <p>Твої розгадані режими (цифра + 8):</p>
         <div class="grid">
-            <button class="test-btn" onclick="send(1, 1)">1,1</button>
-            <button class="test-btn" onclick="send(1, 5)">1,5</button>
-            <button class="test-btn" onclick="send(1, 8)">1,8</button>
-            <button class="test-btn" onclick="send(1, 10)">1,10</button>
-            <button class="test-btn" onclick="send(1, 12)">1,12</button>
-            <button class="test-btn" onclick="send(1, 15)">1,15</button>
+            <button class="mode-btn" onclick="send(11, 8)">МАЛІ<br>(11, 8)</button>
+            <button class="mode-btn" onclick="send(1, 8)">СЕРЕДНІ<br>(1, 8)</button>
+            <button class="mode-btn" onclick="send(2, 8)">НОВИЙ / СТОП<br>(2, 8)</button>
+            <button class="mode-btn" onclick="send(12, 8)">ТЕСТ<br>(12, 8)</button>
         </div>
     </div>
 
     <div class="card">
-        <p>Перевірка значень для заголовка <b>0x0B</b> (Малі/Слабкі):</p>
-        <div class="grid">
-            <button class="test-btn" onclick="send(11, 1)">11,1</button>
-            <button class="test-btn" onclick="send(11, 5)">11,5</button>
-            <button class="test-btn" onclick="send(11, 8)">11,8</button>
-            <button class="test-btn" onclick="send(11, 10)">11,10</button>
-            <button class="test-btn" onclick="send(11, 12)">11,12</button>
-            <button class="test-btn" onclick="send(11, 15)">11,15</button>
+        <p>Шукаємо далі (заголовки + 8):</p>
+        <div class="grid" id="testGrid">
+            <!-- Сюди додамо ще варіантів -->
         </div>
     </div>
-
-    <button class="btn stop-btn" onclick="send(2, 8)">🛑 ВИМКНУТИ (2, 8)</button>
-
-    <div id="console">Логи системи...</div>
 
     <script>
         let char;
         const S_UUID = '78667579-7b48-43db-b8c5-7928a6b0a335';
         const C_UUID = '78667579-a914-49a4-8333-aa3c0cd8fedc';
-
-        function log(m) {
-            const c = document.getElementById('console');
-            c.innerHTML += "> " + m + "<br>";
-            c.scrollTop = c.scrollHeight;
-        }
 
         async function connect() {
             try {
@@ -67,17 +52,26 @@
                 const sv = await s.getPrimaryService(S_UUID);
                 char = await sv.getCharacteristic(C_UUID);
                 document.getElementById('status').innerText = "ПІДКЛЮЧЕНО ✅";
-                log("Зв'язок встановлено.");
-            } catch (e) { log("Помилка: " + e); }
+            } catch (e) { alert(e); }
         }
 
         async function send(h, v) {
             if (!char) return;
             try {
                 await char.writeValue(new Uint8Array([h, v]));
-                log("Надіслано: " + h + ", " + v);
-            } catch (e) { log("Err: " + e); }
+                document.getElementById('lastCmd').innerText = "Остання: " + h + ", " + v;
+            } catch (e) { console.log(e); }
         }
+
+        // Авто-генерація кнопок для тесту
+        const testGrid = document.getElementById('testGrid');
+        [3, 4, 5, 13, 14, 15, 21].forEach(h => {
+            const b = document.createElement('button');
+            b.className = 'mode-btn';
+            b.innerHTML = `ТЕСТ<br>(${h}, 8)`;
+            b.onclick = () => send(h, 8);
+            testGrid.appendChild(b);
+        });
     </script>
 </body>
 </html>

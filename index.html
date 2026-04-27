@@ -20,19 +20,19 @@
     <p id="status">Натисніть кнопку для пошуку...</p>
 
     <script>
-        let characteristic;
-        // Стандартні UUID для китайських девайсів типу Funtown/MagicMotion
+       let device, characteristic;
+        // UUID для Funtown Jive (Magic Motion protocol)
         const SERVICE_UUID = '0000ff10-0000-1000-8000-00805f9b34fb';
         const CHAR_UUID    = '0000ff11-0000-1000-8000-00805f9b34fb';
 
         async function connect() {
             try {
                 document.getElementById('status').innerText = "Шукаю...";
-                // Шукаємо за назвою "Jive" або просто дозволяємо вибрати будь-який пристрій зі списку
                 device = await navigator.bluetooth.requestDevice({
                     filters: [
                         { namePrefix: 'Funtown' },
-                        { namePrefix: 'Jive' }
+                        { namePrefix: 'Jive' },
+                        { services: [SERVICE_UUID] }
                     ],
                     optionalServices: [SERVICE_UUID]
                 });
@@ -42,11 +42,10 @@
                 characteristic = await service.getCharacteristic(CHAR_UUID);
                 document.getElementById('status').innerText = "ЗВ'ЯЗОК Є! ✅";
             } catch (e) {
-                alert("Помилка підключення: " + e);
-                document.getElementById('status').innerText = "Не вдалося підключитись";
+                alert("Помилка: " + e.message);
+                document.getElementById('status').innerText = "Помилка";
             }
         }
-
         async function sendSpeed(val) {
             document.getElementById('speedVal').innerText = val + "%";
             if (!characteristic) return;

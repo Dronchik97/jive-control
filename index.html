@@ -4,50 +4,48 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { background: #121212; color: #eee; text-align: center; font-family: sans-serif; padding: 15px; }
-        .card { background: #222; padding: 20px; border-radius: 15px; border: 1px solid #444; margin-bottom: 15px; }
-        .btn { padding: 15px; background: #0088cc; border: none; border-radius: 10px; color: white; width: 100%; font-weight: bold; cursor: pointer; }
-        .val { font-size: 50px; color: #00ffcc; margin: 15px 0; font-family: monospace; }
-        .controls { display: flex; gap: 10px; }
-        .step-btn { flex: 1; padding: 20px; background: #333; color: white; border: 1px solid #555; border-radius: 10px; font-size: 20px; }
-        .status { font-size: 12px; color: #888; margin-bottom: 10px; }
+        body { background: #0f0f0f; color: #eee; text-align: center; font-family: sans-serif; padding: 15px; }
+        .card { background: #1a1a1a; padding: 20px; border-radius: 15px; border: 1px solid #333; margin-bottom: 15px; }
+        .btn { padding: 15px; background: #0088cc; border: none; border-radius: 10px; color: white; width: 100%; font-weight: bold; cursor: pointer; margin-bottom: 10px; }
+        .val { font-size: 45px; color: #00ffcc; margin: 10px 0; font-family: monospace; }
+        .step-btn { flex: 1; padding: 20px; background: #333; color: white; border: 1px solid #444; border-radius: 10px; font-size: 24px; cursor: pointer; }
+        .disconnect { background: #ff5252; text-transform: uppercase; margin-top: 20px; }
+        .status { font-size: 13px; color: #888; margin-bottom: 15px; }
     </style>
 </head>
 <body>
-    <div id="status" class="status">Треба підключити Jive</div>
-    <button class="btn" onclick="connect()">🔌 ПІДКЛЮЧИТИСЬ</button>
+    <div id="status" class="status">🔌 Треба коннект</div>
+    <button class="btn" onclick="connect()">ПІДКЛЮЧИТИСЬ</button>
 
     <div class="card">
-        <p>Шукаємо чисте вібро (Заголовок 1)</p>
+        <p>Шукаємо вібро на <b>Заголовку 5</b></p>
         <div class="val" id="numDisplay">0</div>
         
-        <div class="controls">
+        <div style="display: flex; gap: 10px;">
             <button class="step-btn" onclick="changeValue(-1)">⬅️</button>
             <button class="step-btn" onclick="changeValue(1)">➡️</button>
         </div>
-        <p style="font-size: 12px; color: #efa00b; margin-top: 15px;">
-            ⚠️ Біт 8 автоматично блокується. <br>
-            (Числа 8-15, 24-31, 40-47 і т.д. будуть пропущені)
-        </p>
+        <p style="font-size: 11px; color: #888; margin-top: 10px;">(Тут теж стоїть фільтр на біт 8)</p>
     </div>
 
-    <button class="btn" style="background: #ff5252;" onclick="send(1, 0)">🛑 СТОП</button>
+    <button class="btn" style="background: #444;" onclick="send(1, 0)">ПРОСТО СТОП (0,0)</button>
+    <button class="btn disconnect" onclick="disconnectDevice()">🚫 ВІДКЛЮЧИТИСЬ (OFF)</button>
 
     <script>
-        let char;
+        let device, char;
         let currentVal = 0;
 
         async function connect() {
             try {
-                const d = await navigator.bluetooth.requestDevice({
+                device = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
                     optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
                 });
-                const s = await d.gatt.connect();
+                const s = await device.gatt.connect();
                 const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
                 char = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-                document.getElementById('status').innerText = "ПІДКЛЮЧЕНО ✅";
-            } catch (e) { alert(e); }
+                document.getElementById('status').innerText = "ПІДКЛЮЧЕНО ДО " + device.name;
+            } catch (e) { alert("Помилка: " + e); }
         }
 
         async function send(h, v) {
@@ -55,22 +53,29 @@
             try {
                 await char.writeValue(new Uint8Array([h, v]));
                 document.getElementById('numDisplay').innerText = v;
-            } catch (e) {}
+            } catch (e) { console.log("Збій відправки"); }
         }
 
         function changeValue(delta) {
             let next = currentVal + delta;
-            
-            // Цикл перевірки: якщо в числі є біт 8 (v & 8), перескакуємо його
             while (next >= 0 && next <= 255 && (next & 8)) {
                 next += delta; 
             }
-
             if (next < 0) next = 0;
             if (next > 255) next = 255;
-
             currentVal = next;
-            send(1, currentVal);
+            // ТЕПЕР ШЛЕМО НА ЗАГОЛОВОК 5
+            send(5, currentVal); 
+        }
+
+        async function disconnectDevice() {
+            if (device && device.gatt.connected) {
+                await send(1, 0); // Пробуємо спочатку вимкнути мотори
+                await device.gatt.disconnect();
+                document.getElementById('status').innerText = "❌ ВІДКЛЮЧЕНО";
+                document.getElementById('numDisplay').innerText = "0";
+                currentVal = 0;
+            }
         }
     </script>
 </body>

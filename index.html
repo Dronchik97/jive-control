@@ -4,74 +4,52 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { background: #121212; color: white; text-align: center; font-family: sans-serif; padding: 15px; }
-        .card { background: #222; padding: 15px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #333; }
-        .btn { padding: 15px; background: #0088cc; border: none; border-radius: 8px; color: white; width: 100%; font-size: 16px; margin-bottom: 10px; cursor: pointer; font-weight: bold; }
-        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .mode-btn { background: #333; border: 1px solid #555; padding: 15px; color: white; border-radius: 8px; font-size: 14px; }
-        .mode-btn:active { background: #555; }
-        #status { padding: 10px; border-radius: 5px; background: #222; font-size: 13px; color: #00ff00; margin-bottom: 10px; }
-        .current-cmd { font-size: 20px; color: #efa00b; margin: 10px 0; }
+        body { background: #121212; color: white; text-align: center; font-family: sans-serif; padding: 20px; }
+        .card { background: #222; padding: 20px; border-radius: 15px; margin-bottom: 20px; border: 1px solid #444; }
+        input[type=range] { width: 100%; margin: 20px 0; cursor: pointer; }
+        .val-display { font-size: 24px; color: #00ffcc; font-weight: bold; }
+        .btn { padding: 15px; background: #0088cc; border: none; border-radius: 10px; color: white; width: 100%; font-weight: bold; margin-bottom: 20px; }
+        .stop { background: #ff5252; }
     </style>
 </head>
 <body>
-    <div id="status">Статус: Готовий</div>
     <button class="btn" onclick="connect()">🔌 ПІДКЛЮЧИТИСЬ</button>
 
-    <div class="current-cmd" id="lastCmd">Остання: ---</div>
-
     <div class="card">
-        <p>Твої розгадані режими (цифра + 8):</p>
-        <div class="grid">
-            <button class="mode-btn" onclick="send(11, 8)">МАЛІ<br>(11, 8)</button>
-            <button class="mode-btn" onclick="send(1, 8)">СЕРЕДНІ<br>(1, 8)</button>
-            <button class="mode-btn" onclick="send(2, 8)">НОВИЙ / СТОП<br>(2, 8)</button>
-            <button class="mode-btn" onclick="send(12, 8)">ТЕСТ<br>(12, 8)</button>
-        </div>
+        <p>КАНАЛ 1 (Найімовірніший)</p>
+        <input type="range" min="0" max="255" value="0" oninput="updateVibro(1, this.value, 'v1')">
+        <div class="val-display" id="v1">0</div>
     </div>
 
     <div class="card">
-        <p>Шукаємо далі (заголовки + 8):</p>
-        <div class="grid" id="testGrid">
-            <!-- Сюди додамо ще варіантів -->
-        </div>
+        <p>КАНАЛ 5 (Альтернативний)</p>
+        <input type="range" min="0" max="255" value="0" oninput="updateVibro(5, this.value, 'v2')">
+        <div class="val-display" id="v2">0</div>
     </div>
+
+    <button class="btn stop" onclick="updateVibro(1, 0, 'v1'); updateVibro(5, 0, 'v2');">🛑 СТОП</button>
 
     <script>
         let char;
-        const S_UUID = '78667579-7b48-43db-b8c5-7928a6b0a335';
-        const C_UUID = '78667579-a914-49a4-8333-aa3c0cd8fedc';
-
         async function connect() {
-            try {
-                const d = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: [S_UUID]
-                });
-                const s = await d.gatt.connect();
-                const sv = await s.getPrimaryService(S_UUID);
-                char = await sv.getCharacteristic(C_UUID);
-                document.getElementById('status').innerText = "ПІДКЛЮЧЕНО ✅";
-            } catch (e) { alert(e); }
+            const d = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
+            });
+            const s = await d.gatt.connect();
+            const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
+            char = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
+            alert("Зв'язок є!");
         }
 
-        async function send(h, v) {
+        async function updateVibro(h, v, displayId) {
+            document.getElementById(displayId).innerText = v;
             if (!char) return;
             try {
-                await char.writeValue(new Uint8Array([h, v]));
-                document.getElementById('lastCmd').innerText = "Остання: " + h + ", " + v;
-            } catch (e) { console.log(e); }
+                // Шлемо заголовок + значення швидкості
+                await char.writeValue(new Uint8Array([h, parseInt(v)]));
+            } catch (e) {}
         }
-
-        // Авто-генерація кнопок для тесту
-        const testGrid = document.getElementById('testGrid');
-        [3, 4, 5, 13, 14, 15, 21].forEach(h => {
-            const b = document.createElement('button');
-            b.className = 'mode-btn';
-            b.innerHTML = `ТЕСТ<br>(${h}, 8)`;
-            b.onclick = () => send(h, 8);
-            testGrid.appendChild(b);
-        });
     </script>
 </body>
 </html>

@@ -5,37 +5,30 @@
     <style>
         body { background: #000; color: #0f0; text-align: center; font-family: monospace; padding: 20px; }
         .panel { border: 2px solid #0f0; padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; }
-        .btn { padding: 15px; margin: 10px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; }
+        .btn { padding: 15px; margin: 5px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; }
         .c { background: #0066ff; color: #fff; }
         .v { background: #ff00ff; color: #fff; }
         .s { background: #f00; color: #fff; }
-        input[type=range] { width: 100%; height: 30px; }
     </style>
 </head>
 <body>
     <div class="panel">
-        <h3>JIVE: 8-BYTE COMMANDER</h3>
+        <h3>JIVE: ANTI-PROTECTION UNIT</h3>
         <div id="st">СТАТУС: OFF</div>
         <button class="btn c" onclick="conn()">🔌 1. КОННЕКТ</button>
 
-        <div style="margin: 20px 0;">
-            <label>ТОЛКАЧКИ (Byte 2): <span id="tV">0</span></label>
-            <input type="range" min="0" max="255" value="0" id="tS" oninput="update()">
-        </div>
-
-        <div style="margin: 20px 0;">
-            <label>ВІБРАЦІЯ (Byte 3): <span id="vV">0</span></label>
-            <input type="range" min="0" max="255" value="0" id="vS" oninput="update()">
-        </div>
-
-        <button class="btn v" onclick="send([1, 0, 200, 0, 0, 0, 0, 0])">🔥 ТІЛЬКИ ВІБРО (ТЕСТ)</button>
-        <button class="btn s" onclick="fullStop()">🛑 ЖОРСТКИЙ СТОП</button>
+        <hr>
+        <p>Плавний пуск вібро (Заголовок 2):</p>
+        <button class="btn v" onclick="softStart(2)">🚀 ПЛАВНИЙ ПУСК (Ch 2)</button>
+        <button class="btn v" onclick="softStart(5)">🚀 ПЛАВНИЙ ПУСК (Ch 5)</button>
+        
+        <hr>
+        <button class="btn s" onclick="fullStop()">🛑 СТОП / RESET</button>
     </div>
 
     <script>
-        let d, c;
-        const tS = document.getElementById('tS'), vS = document.getElementById('vS');
-        
+        let d, c, testLoop;
+
         async function conn() {
             try {
                 d = await navigator.bluetooth.requestDevice({
@@ -48,26 +41,31 @@
             } catch (e) { alert(e); }
         }
 
-        function update() {
-            document.getElementById('tV').innerText = tS.value;
-            document.getElementById('vV').innerText = vS.value;
-            // Пакет з 8 байтів: [Заголовок, Толкачки, Вібро, 0, 0, 0, 0, 0]
-            send([1, parseInt(tS.value), parseInt(vS.value), 0, 0, 0, 0, 0]);
+        async function softStart(header) {
+            clearInterval(testLoop);
+            document.getElementById('st').innerText = "⚡ ПУСК КАНАЛУ " + header;
+            let val = 0;
+            
+            testLoop = setInterval(async () => {
+                if(val > 255) { clearInterval(testLoop); return; }
+                
+                try {
+                    // Шлемо довгий пакет, щоб стабілізувати контролер
+                    await c.writeValueWithoutResponse(new Uint8Array([header, val, 0, 0, 0, 0, 0, 0]));
+                    val += 5; // Піднімаємо дуже плавно
+                    console.log("Header " + header + " Power: " + val);
+                } catch (e) {}
+            }, 100); 
         }
 
         async function fullStop() {
+            clearInterval(testLoop);
             if(c) {
-                // Шлемо нулі декілька разів, щоб "пробити" ігнор
-                for(let i=0; i<3; i++) {
-                    await c.writeValueWithoutResponse(new Uint8Array([1, 0, 0, 0, 0, 0, 0, 0]));
-                }
+                // Шлемо 0 на обидва підозрілі канали
+                await c.writeValueWithoutResponse(new Uint8Array([1, 0, 0, 0, 0, 0, 0, 0]));
+                await c.writeValueWithoutResponse(new Uint8Array([2, 0, 0, 0, 0, 0, 0, 0]));
             }
-            document.getElementById('st').innerText = "🛑 СТОП НАДІСЛАНО";
-        }
-
-        async function send(arr) {
-            if (!c) return;
-            try { await c.writeValueWithoutResponse(new Uint8Array(arr)); } catch (e) {}
+            document.getElementById('st').innerText = "🛑 STOPPED";
         }
     </script>
 </body>

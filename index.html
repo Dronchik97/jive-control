@@ -4,35 +4,38 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { background: #121212; color: #eee; text-align: center; font-family: sans-serif; padding: 20px; }
-        .card { background: #222; padding: 15px; border-radius: 12px; border: 1px solid #444; margin-bottom: 20px; }
-        .btn { padding: 15px; background: #0088cc; border: none; border-radius: 8px; color: white; width: 100%; font-weight: bold; margin-bottom: 10px; cursor: pointer; }
-        #status { color: #00ffcc; margin-bottom: 20px; font-size: 14px; }
-        .val { font-size: 40px; color: #efa00b; margin: 20px 0; }
-        .small-btn { width: 48%; display: inline-block; background: #444; }
+        body { background: #121212; color: #eee; text-align: center; font-family: sans-serif; padding: 15px; }
+        .card { background: #222; padding: 20px; border-radius: 15px; border: 1px solid #444; margin-bottom: 15px; }
+        .btn { padding: 15px; background: #0088cc; border: none; border-radius: 10px; color: white; width: 100%; font-weight: bold; cursor: pointer; }
+        .val { font-size: 50px; color: #00ffcc; margin: 15px 0; font-family: monospace; }
+        .controls { display: flex; gap: 10px; }
+        .step-btn { flex: 1; padding: 20px; background: #333; color: white; border: 1px solid #555; border-radius: 10px; font-size: 20px; }
+        .status { font-size: 12px; color: #888; margin-bottom: 10px; }
     </style>
 </head>
 <body>
-    <div id="status">Статус: Треба коннект</div>
+    <div id="status" class="status">Треба підключити Jive</div>
     <button class="btn" onclick="connect()">🔌 ПІДКЛЮЧИТИСЬ</button>
 
     <div class="card">
-        <p>Поточне значення (Заголовок 1):</p>
-        <div class="val" id="num">0</div>
+        <p>Шукаємо чисте вібро (Заголовок 1)</p>
+        <div class="val" id="numDisplay">0</div>
         
-        <div style="display: flex; justify-content: space-between;">
-            <button class="btn small-btn" onclick="step(-1)">⬅️ МЕНШЕ</button>
-            <button class="btn small-btn" onclick="step(1)">БІЛЬШЕ ➡️</button>
+        <div class="controls">
+            <button class="step-btn" onclick="changeValue(-1)">⬅️</button>
+            <button class="step-btn" onclick="changeValue(1)">➡️</button>
         </div>
-        
-        <p style="font-size: 12px; color: #888;">Клацай по одному. Шукай число, де він просто гуде, а не дьоргається.</p>
+        <p style="font-size: 12px; color: #efa00b; margin-top: 15px;">
+            ⚠️ Біт 8 автоматично блокується. <br>
+            (Числа 8-15, 24-31, 40-47 і т.д. будуть пропущені)
+        </p>
     </div>
 
-    <button class="btn" style="background: #ff5252;" onclick="send(1, 0)">🛑 СТОП (0)</button>
+    <button class="btn" style="background: #ff5252;" onclick="send(1, 0)">🛑 СТОП</button>
 
     <script>
         let char;
-        let current = 0;
+        let currentVal = 0;
 
         async function connect() {
             try {
@@ -51,15 +54,23 @@
             if (!char) return;
             try {
                 await char.writeValue(new Uint8Array([h, v]));
-                document.getElementById('num').innerText = v;
+                document.getElementById('numDisplay').innerText = v;
             } catch (e) {}
         }
 
-        function step(delta) {
-            current += delta;
-            if (current < 0) current = 255;
-            if (current > 255) current = 0;
-            send(1, current);
+        function changeValue(delta) {
+            let next = currentVal + delta;
+            
+            // Цикл перевірки: якщо в числі є біт 8 (v & 8), перескакуємо його
+            while (next >= 0 && next <= 255 && (next & 8)) {
+                next += delta; 
+            }
+
+            if (next < 0) next = 0;
+            if (next > 255) next = 255;
+
+            currentVal = next;
+            send(1, currentVal);
         }
     </script>
 </body>

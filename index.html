@@ -46,14 +46,26 @@
             }
         }
 
-        async function updateSpeed(val) {
-            if (!characteristic) return;
-            try {
-                // Команда для We-Vibe: 0x0f (тип), рівень швидкості (0-15), 0x00
-                const data = new Uint8Array([0x0f, parseInt(val), 0x00]);
-                await characteristic.writeValue(data);
-            } catch (err) {
-                console.log("Помилка відправки: " + err);
+       async function updateSpeed(val) {
+    if (!characteristic) return;
+    try {
+        let speed = parseInt(val);
+        // Спробуємо три варіанти команди (розкоментовуй по черзі, якщо перший не піде):
+        
+        // Варіант 1: Стандарт для Jive
+        let data = new Uint8Array([0x0f, speed, 0x00]); 
+        
+        // Варіант 2: Якщо варіант 1 не робить (іноді треба 0x03 на початку)
+        // let data = new Uint8Array([0x03, speed, 0x00]); 
+
+        await characteristic.writeValueWithResponse(data);
+        console.log("Відправлено швидкість: " + speed);
+    } catch (err) {
+        // Якщо помилка 'GATT operation not permitted', пробуємо без відповіді
+        const data = new Uint8Array([0x0f, parseInt(val), 0x00]);
+        await characteristic.writeValueWithoutResponse(data);
+    }
+}
             }
         }
     </script>

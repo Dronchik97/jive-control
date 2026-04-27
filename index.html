@@ -29,18 +29,33 @@
     <script>
         let characteristic;
         // Ці UUID часто юзаються в комбінованих китайських іграшках
-        const SERVICE_UUID = 'f000bb03-0451-4000-b000-000000000000'; 
-        const CHAR_UUID    = 0xff01; 
+        const SERVICE_UUID = '78667579-7b48-43db-b8c5-7928a6b0a335';
+const CHAR_UUID    = '78667579-a914-49a4-8333-aa3c0cd8fedc';
 
-        function log(m) { document.getElementById('log').innerHTML += "<br>> " + m; }
+async function connect() {
+    try {
+        device = await navigator.bluetooth.requestDevice({
+            filters: [{ name: 'CBT001' }],
+            optionalServices: [SERVICE_UUID]
+        });
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService(SERVICE_UUID);
+        characteristic = await service.getCharacteristic(CHAR_UUID);
+        document.getElementById('status').innerText = "ПІДКЛЮЧЕНО ✅";
+    } catch (err) {
+        document.getElementById('status').innerText = "Помилка: " + err;
+    }
+}
 
-        async function connect() {
-            try {
-                log("Шукаю CBT001...");
-                const device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: [SERVICE_UUID, 0xff10, 0xfee9]
-                });
+async function sendSpeed(val) {
+    if (!characteristic) return;
+    // Для We-Vibe Jive спробуємо стандартний байт-код: 0x0f (тип) + швидкість (0-15) + 0x00
+    const data = new Uint8Array([0x0f, parseInt(val), 0x00]);
+    
+    // Використовуємо writeValueWithResponse або writeValue, 
+    // бо деякі браузери автоматично вибирають потрібний метод
+    await characteristic.writeValue(data);
+};
 
                 const server = await device.gatt.connect();
                 log("Підключено! Шукаю порти...");

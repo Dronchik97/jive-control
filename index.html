@@ -4,30 +4,29 @@
     <meta charset="UTF-8">
     <style>
         body { background: #000; color: #0f0; text-align: center; font-family: monospace; padding: 20px; }
-        .panel { border: 2px solid #0f0; padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; }
-        .btn { padding: 15px; margin: 5px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; }
+        .panel { border: 2px solid #0f0; padding: 20px; border-radius: 15px; max-width: 500px; margin: auto; }
+        .btn { padding: 15px; margin: 5px; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; }
         .c { background: #0066ff; color: #fff; }
-        .v { background: #ff00ff; color: #fff; }
-        .s { background: #f00; color: #fff; }
+        .scan { background: #ff00ff; color: #fff; }
+        .stop { background: #f00; color: #fff; }
+        #log { font-size: 12px; text-align: left; background: #111; padding: 10px; height: 150px; overflow-y: scroll; margin-top: 10px; border: 1px solid #333; }
     </style>
 </head>
 <body>
     <div class="panel">
-        <h3>JIVE: ANTI-PROTECTION UNIT</h3>
+        <h3>JIVE: VIBRO UNLOCKER</h3>
         <div id="st">СТАТУС: OFF</div>
         <button class="btn c" onclick="conn()">🔌 1. КОННЕКТ</button>
-
-        <hr>
-        <p>Плавний пуск вібро (Заголовок 2):</p>
-        <button class="btn v" onclick="softStart(2)">🚀 ПЛАВНИЙ ПУСК (Ch 2)</button>
-        <button class="btn v" onclick="softStart(5)">🚀 ПЛАВНИЙ ПУСК (Ch 5)</button>
         
-        <hr>
-        <button class="btn s" onclick="fullStop()">🛑 СТОП / RESET</button>
+        <button class="btn scan" onclick="startScan()">🚀 ЗАПУСТИТИ СКАНУВАННЯ ВІБРО</button>
+        <button class="btn stop" onclick="fullStop()">🛑 СТОП / RESET</button>
+
+        <div id="log">Лог команд...</div>
     </div>
 
     <script>
-        let d, c, testLoop;
+        let d, c, scanIndex = 0;
+        const log = document.getElementById('log');
 
         async function conn() {
             try {
@@ -37,54 +36,39 @@
                 const s = await d.gatt.connect();
                 const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
                 c = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-                document.getElementById('st').innerText = "🟢 READY";
+                document.getElementById('st').innerText = "🟢 ГОТОВО";
             } catch (e) { alert(e); }
         }
 
-        async function softStart(header) {
-            clearInterval(testLoop);
-            document.getElementById('st').innerText = "⚡ ПУСК КАНАЛУ " + header;
-            let val = 0;
-            
-            testLoop = setInterval(async () => {
-                if(val > 255) { clearInterval(testLoop); return; }
+        const variants = [
+            { name: "3-байтовий (Channel 1, Vibe on Byte 2)", data: [1, 100, 0] },
+            { name: "3-байтовий (Channel 1, Vibe on Byte 3)", data: [1, 0, 100] },
+            { name: "Канал 3 (Vibro-only)", data: [3, 100] },
+            { name: "Канал 4 (Vibro-only)", data: [4, 100] },
+            { name: "Канал 7 (Custom Vibe)", data: [7, 100] },
+            { name: "8-байтовий (Full structure)", data: [1, 0, 100, 0, 0, 0, 0, 0] },
+            { name: "Handshake + Vibe", data: [0x55, 0x03, 1, 100] }
+        ];
+
+        async function startScan() {
+            for (let v of variants) {
+                log.innerHTML += `<div>Спроба: ${v.name}...</div>`;
+                log.scrollTop = log.scrollHeight;
                 
                 try {
-                    // Шлемо довгий пакет, щоб стабілізувати контролер
-                    await c.writeValueWithoutResponse(new Uint8Array([header, val, 0, 0, 0, 0, 0, 0]));
-                    val += 5; // Піднімаємо дуже плавно
-                    console.log("Header " + header + " Power: " + val);
+                    await c.writeValueWithoutResponse(new Uint8Array(v.data));
+                    // Чекаємо 3 секунди, щоб ти зрозумів, чи воно запрацювало
+                    await new Promise(r => setTimeout(r, 3000)); 
+                    // Зупиняємо перед наступним тестом
+                    await c.writeValueWithoutResponse(new Uint8Array([1, 0]));
                 } catch (e) {}
-            }, 100); 
-        }
-async function ultimateVibeSearch() {
-  const codes = [
-    [3, 150],             // Заголовок 3 (часто вібро в Thrust-моделях)
-    [7, 150],             // Заголовок 7
-    [1, 8, 150],          // 3 байти: 1-й толкачки (8), 2-й вібро (150)
-    [1, 150, 8],          // Навпаки: 1-й вібро, 2-й толкачки
-    [0x55, 0x03, 1, 150], // Розширений пакет 55 03
-    [0x01, 0x10, 0, 150]  // Специфічний режим для wearable
-  ];
-
-  for (let code of codes) {
-    console.log("Пробую код:", code);
-    try {
-      await char.writeValueWithoutResponse(new Uint8Array(code));
-      // Даємо 2 секунди перевірити, чи зажужжав
-      await new Promise(r => setTimeout(r, 2000)); 
-    } catch (e) { console.log("Помилка на коді", code); }
-  }
-  console.log("Сканування закінчено");
-}
-        async function fullStop() {
-            clearInterval(testLoop);
-            if(c) {
-                // Шлемо 0 на обидва підозрілі канали
-                await c.writeValueWithoutResponse(new Uint8Array([1, 0, 0, 0, 0, 0, 0, 0]));
-                await c.writeValueWithoutResponse(new Uint8Array([2, 0, 0, 0, 0, 0, 0, 0]));
             }
-            document.getElementById('st').innerText = "🛑 STOPPED";
+            log.innerHTML += `<div>--- СКАНУВАННЯ ЗАВЕРШЕНО ---</div>`;
+        }
+
+        async function fullStop() {
+            if(c) await c.writeValueWithoutResponse(new Uint8Array([1, 0, 0, 0, 0, 0, 0, 0]));
+            document.getElementById('st').innerText = "🛑 STOP";
         }
     </script>
 </body>

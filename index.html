@@ -3,34 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        body { background: #000; color: #00ffcc; text-align: center; font-family: sans-serif; padding: 20px; }
-        .panel { border: 2px solid #00ffcc; padding: 20px; border-radius: 15px; background: #0a0a0a; max-width: 400px; margin: auto; }
-        .btn { padding: 15px; margin: 5px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; }
-        .c { background: #0088cc; color: #fff; }
-        .vibe { background: #ff00ff; color: #fff; }
-        .stop { background: #cc0000; color: #fff; }
-        .slider-group { margin: 20px 0; border: 1px solid #333; padding: 10px; border-radius: 10px; }
+        body { background: #000; color: #0f0; text-align: center; font-family: monospace; padding: 20px; }
+        .panel { border: 2px solid #0f0; padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; }
+        .btn { padding: 15px; margin: 10px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; }
+        .c { background: #0066ff; color: #fff; }
+        .v { background: #ff00ff; color: #fff; }
+        .s { background: #f00; color: #fff; }
         input[type=range] { width: 100%; height: 30px; }
     </style>
 </head>
 <body>
     <div class="panel">
-        <h3>JIVE: КОНТРОЛЬ МОТОРІВ</h3>
-        <div id="st">🔴 СТАТУС: OFF</div>
+        <h3>JIVE: 8-BYTE COMMANDER</h3>
+        <div id="st">СТАТУС: OFF</div>
         <button class="btn c" onclick="conn()">🔌 1. КОННЕКТ</button>
 
-        <div class="slider-group">
-            <label>ТОЛКАЧКИ (Заголовок 1): <span id="tV">0</span></label>
+        <div style="margin: 20px 0;">
+            <label>ТОЛКАЧКИ (Byte 2): <span id="tV">0</span></label>
             <input type="range" min="0" max="255" value="0" id="tS" oninput="update()">
         </div>
 
-        <div class="slider-group" style="border-color: #ff00ff;">
-            <label>ВІБРО (Заголовок 2): <span id="vV">0</span></label>
-            <input type="range" min="0" max="255" value="0" id="vS" oninput="updateVibe()">
+        <div style="margin: 20px 0;">
+            <label>ВІБРАЦІЯ (Byte 3): <span id="vV">0</span></label>
+            <input type="range" min="0" max="255" value="0" id="vS" oninput="update()">
         </div>
 
-        <button class="btn vibe" onclick="send([1, parseInt(tS.value), 255])">ТЕСТ: 3 БАЙТИ (Комбо)</button>
-        <button class="btn stop" onclick="stop()">🛑 ВИМКНУТИ ВСЕ</button>
+        <button class="btn v" onclick="send([1, 0, 200, 0, 0, 0, 0, 0])">🔥 ТІЛЬКИ ВІБРО (ТЕСТ)</button>
+        <button class="btn s" onclick="fullStop()">🛑 ЖОРСТКИЙ СТОП</button>
     </div>
 
     <script>
@@ -45,34 +44,30 @@
                 const s = await d.gatt.connect();
                 const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
                 c = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-                document.getElementById('st').innerText = "🟢 ПІДКЛЮЧЕНО";
+                document.getElementById('st').innerText = "🟢 READY";
             } catch (e) { alert(e); }
         }
 
-        // Керування толкачками (те, що ми вже знаємо)
         function update() {
             document.getElementById('tV').innerText = tS.value;
-            send([1, parseInt(tS.value)]); 
+            document.getElementById('vV').innerText = vS.value;
+            // Пакет з 8 байтів: [Заголовок, Толкачки, Вібро, 0, 0, 0, 0, 0]
+            send([1, parseInt(tS.value), parseInt(vS.value), 0, 0, 0, 0, 0]);
         }
 
-        // Шукаємо вібро через заголовок 2
-        function updateVibe() {
-            document.getElementById('vV').innerText = vS.value;
-            send([2, parseInt(vS.value)]); 
+        async function fullStop() {
+            if(c) {
+                // Шлемо нулі декілька разів, щоб "пробити" ігнор
+                for(let i=0; i<3; i++) {
+                    await c.writeValueWithoutResponse(new Uint8Array([1, 0, 0, 0, 0, 0, 0, 0]));
+                }
+            }
+            document.getElementById('st').innerText = "🛑 СТОП НАДІСЛАНО";
         }
 
         async function send(arr) {
             if (!c) return;
-            try {
-                await c.writeValueWithoutResponse(new Uint8Array(arr));
-            } catch (e) {}
-        }
-
-        function stop() {
-            if(c) {
-                send([1, 0]);
-                send([2, 0]);
-            }
+            try { await c.writeValueWithoutResponse(new Uint8Array(arr)); } catch (e) {}
         }
     </script>
 </body>

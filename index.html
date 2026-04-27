@@ -3,26 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        body { background: #000; color: #0f0; text-align: center; font-family: monospace; padding: 20px; }
-        .panel { border: 2px solid #0f0; padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; }
-        .btn { padding: 15px; margin: 10px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; }
-        .conn { background: #0066ff; color: #fff; }
-        .scan { background: #ff00ff; color: #fff; }
-        #disp { font-size: 24px; margin: 20px; color: #fff; }
+        body { background: #000; color: #fff; text-align: center; font-family: monospace; padding: 20px; }
+        .panel { border: 2px solid #ffaa00; padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; }
+        .btn { padding: 15px; margin: 10px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; font-size: 14px; }
+        .conn { background: #0066ff; color: white; }
+        .h18 { background: #ffaa00; color: black; }
+        .h19 { background: #ff5500; color: white; }
+        #disp { font-size: 40px; margin: 20px; color: #ffaa00; background: #222; padding: 10px; border-radius: 10px; }
     </style>
 </head>
 <body>
     <div class="panel">
-        <h3>JIVE: MAGIC DECODER</h3>
+        <h3>JIVE: DEEP SCAN (H18/H19)</h3>
         <div id="st">СТАТУС: OFF</div>
         <button class="btn conn" onclick="conn()">🔌 1. КОННЕКТ</button>
         
-        <div id="disp">Чекаю...</div>
+        <div id="disp">0</div>
         
-        <button class="btn scan" onclick="runScan(11)">🚀 СКАН HEADER 11</button>
-        <button class="btn scan" onclick="runScan(255)">🚀 СКАН HEADER 255</button>
+        <button class="btn h18" onclick="runScan(18)">🚀 ТОЧНИЙ СКАН H18</button>
+        <button class="btn h19" onclick="runScan(19)">🚀 ТОЧНИЙ СКАН H19</button>
         
-        <button class="btn" style="background:red; color:#fff" onclick="stopScan()">🛑 СТОП</button>
+        <button class="btn" style="background:red; color:white; margin-top:20px;" onclick="stopScan()">🛑 СТОП</button>
     </div>
 
     <script>
@@ -46,21 +47,19 @@
             if(!ch) return;
             val = 1;
             clearInterval(scanner);
-            document.getElementById('st').innerText = "📡 ШУКАЮ В H" + header;
+            document.getElementById('st').innerText = "📡 ПЕРЕБІР H" + header;
 
             scanner = setInterval(async () => {
                 if(val > 255) { stopScan(); return; }
                 if(blackList.includes(val)) { val++; return; }
 
-                document.getElementById('disp').innerText = `[${header}, ${val}, 0, 1]`;
-                
+                document.getElementById('disp').innerText = val;
                 try {
-                    // Багатобайтовий пакет Magic Motion: [Header, Power, Mode, Control]
-                    await ch.writeValueWithoutResponse(new Uint8Array([header, val, 0, 1]));
+                    // Шлемо 3-байтовий пакет на нових заголовках
+                    await ch.writeValueWithoutResponse(new Uint8Array([header, val, 1]));
                 } catch (e) {}
-
-                val += 5; // Йдемо кроком 5, щоб швидше зачепити вібро
-            }, 300); 
+                val++; 
+            }, 150); 
         }
 
         function stopScan() {

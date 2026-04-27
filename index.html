@@ -3,63 +3,78 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        body { background: #000; color: #00ffcc; text-align: center; font-family: sans-serif; padding: 10px; }
-        .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; max-width: 450px; margin: auto; }
-        button { padding: 15px 5px; background: #1a1a1a; color: #00ffcc; border: 1px solid #333; cursor: pointer; font-size: 14px; }
-        button:active { background: #00ffcc; color: #000; }
-        .special { background: #0044ff; color: #fff; border-color: #fff; }
-        .log { margin-top: 15px; font-size: 12px; color: #666; }
+        body { background: #000; color: #0f0; text-align: center; font-family: monospace; padding: 20px; }
+        .panel { border: 2px solid #0f0; padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; }
+        .btn { padding: 15px; margin: 10px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; }
+        .conn { background: #0066ff; color: #fff; }
+        .start { background: #ff00ff; color: #fff; }
+        .stop { background: #f00; color: #fff; }
+        #cur { font-size: 48px; margin: 20px; color: #fff; }
+        .log { font-size: 14px; color: #888; }
     </style>
 </head>
 <body>
-    <h3>JIVE SCANNER: 11-30</h3>
-    <p>8=Thrust, 10=LED S. Шукаємо Vibe.</p>
-    
-    <button onclick="conn()" class="special" style="width:100%; margin-bottom:15px; padding:15px;">🔌 ПІДКЛЮЧИТИСЬ</button>
-
-    <div class="grid">
-        <!-- Наступна пачка індексів -->
-        <button onclick="send(11)">11</button>
-        <button onclick="send(12)">12</button>
-        <button onclick="send(13)">13</button>
-        <button onclick="send(14)">14</button>
-        <button onclick="send(15)">15</button>
-        <button onclick="send(16)">16</button>
-        <button onclick="send(17)">17</button>
-        <button onclick="send(18)">18</button>
-        <button onclick="send(19)">19</button>
-        <button onclick="send(20)">20</button>
-        <button onclick="send(21)">21</button>
-        <button onclick="send(22)">22</button>
-        <button onclick="send(23)">23</button>
-        <button onclick="send(24)">24</button>
-        <button onclick="send(25)">25</button>
-        <button onclick="send(30)">30</button>
-        <button onclick="send(64)">64</button>
-        <button onclick="send(128)">128</button>
+    <div class="panel">
+        <h3>JIVE AUTO-SCANNER</h3>
+        <div id="st">СТАТУС: OFF</div>
+        <button class="btn conn" onclick="conn()">🔌 1. КОННЕКТ</button>
+        
+        <div id="cur">0</div>
+        
+        <button class="btn start" id="sBtn" onclick="startScan()">🚀 ЗАПУСТИТИ АВТОСКАН</button>
+        <button class="btn stop" onclick="stopScan()">🛑 СТОП (ЗАПАМ'ЯТАЙ ЦИФРУ)</button>
+        
+        <div class="log">Пропускаємо: 8, 10</div>
     </div>
 
-    <div class="log" id="l">Чекаю команду...</div>
-
     <script>
-        let ch;
+        let d, c, scanner;
+        let currentIdx = 1;
+        const skip = [8, 10]; // Твій чорний список
+
         async function conn() {
             try {
-                const d = await navigator.bluetooth.requestDevice({
+                d = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true, optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
                 });
                 const s = await d.gatt.connect();
                 const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
-                ch = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-                document.getElementById('l').innerText = "ПІДКЛЮЧЕНО";
+                c = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
+                document.getElementById('st').innerText = "🟢 ПІДКЛЮЧЕНО";
             } catch (e) { alert(e); }
         }
 
-        async function send(idx) {
-            if(!ch) return;
-            document.getElementById('l').innerText = "Шлю індекс: " + idx;
-            // Пробуємо стандартний пакет [1, індекс]
-            await ch.writeValueWithoutResponse(new Uint8Array([1, idx]));
+        async function startScan() {
+            if(!c) return;
+            document.getElementById('sBtn').disabled = true;
+            
+            scanner = setInterval(async () => {
+                // Перевіряємо, чи не в списку виключень
+                while(skip.includes(currentIdx)) {
+                    currentIdx++;
+                }
+
+                if(currentIdx > 255) {
+                    stopScan();
+                    alert("Сканування закінчено!");
+                    return;
+                }
+
+                document.getElementById('cur').innerText = currentIdx;
+                
+                try {
+                    // Шлемо [1, індекс, 255] для максимального ефекту
+                    await c.writeValueWithoutResponse(new Uint8Array([1, currentIdx, 255]));
+                } catch (e) {}
+
+                currentIdx++;
+            }, 1500); // 1.5 секунди на кожну цифру, щоб ти встиг зреагувати
+        }
+
+        function stopScan() {
+            clearInterval(scanner);
+            document.getElementById('sBtn').disabled = false;
+            document.getElementById('st').innerText = "🛑 ЗУПИНЕНО НА " + (currentIdx - 1);
         }
     </script>
 </body>

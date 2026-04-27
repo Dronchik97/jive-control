@@ -57,7 +57,26 @@
                 } catch (e) {}
             }, 100); 
         }
+async function ultimateVibeSearch() {
+  const codes = [
+    [3, 150],             // Заголовок 3 (часто вібро в Thrust-моделях)
+    [7, 150],             // Заголовок 7
+    [1, 8, 150],          // 3 байти: 1-й толкачки (8), 2-й вібро (150)
+    [1, 150, 8],          // Навпаки: 1-й вібро, 2-й толкачки
+    [0x55, 0x03, 1, 150], // Розширений пакет 55 03
+    [0x01, 0x10, 0, 150]  // Специфічний режим для wearable
+  ];
 
+  for (let code of codes) {
+    console.log("Пробую код:", code);
+    try {
+      await char.writeValueWithoutResponse(new Uint8Array(code));
+      // Даємо 2 секунди перевірити, чи зажужжав
+      await new Promise(r => setTimeout(r, 2000)); 
+    } catch (e) { console.log("Помилка на коді", code); }
+  }
+  console.log("Сканування закінчено");
+}
         async function fullStop() {
             clearInterval(testLoop);
             if(c) {

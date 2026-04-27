@@ -9,28 +9,25 @@
         .conn { background: #0066ff; color: #fff; }
         .start { background: #ff00ff; color: #fff; }
         .stop { background: #f00; color: #fff; }
-        #cur { font-size: 48px; margin: 20px; color: #fff; }
-        .log { font-size: 14px; color: #888; }
+        #disp { font-size: 24px; margin: 20px; color: #fff; }
     </style>
 </head>
 <body>
     <div class="panel">
-        <h3>JIVE AUTO-SCANNER</h3>
+        <h3>JIVE: ULTIMATE BRUTEFORCER</h3>
         <div id="st">СТАТУС: OFF</div>
         <button class="btn conn" onclick="conn()">🔌 1. КОННЕКТ</button>
         
-        <div id="cur">0</div>
+        <div id="disp">Пакет: [?, ?]</div>
         
-        <button class="btn start" id="sBtn" onclick="startScan()">🚀 ЗАПУСТИТИ АВТОСКАН</button>
-        <button class="btn stop" onclick="stopScan()">🛑 СТОП (ЗАПАМ'ЯТАЙ ЦИФРУ)</button>
-        
-        <div class="log">Пропускаємо: 8, 10</div>
+        <button class="btn start" id="b3" onclick="autoScan(3)">🚀 СКАН ЗАГОЛОВКА 3</button>
+        <button class="btn start" id="b5" onclick="autoScan(5)">🚀 СКАН ЗАГОЛОВКА 5</button>
+        <button class="btn stop" onclick="stopScan()">🛑 СТОП</button>
     </div>
 
     <script>
         let d, c, scanner;
         let currentIdx = 1;
-        const skip = [8, 10]; // Твій чорний список
 
         async function conn() {
             try {
@@ -40,41 +37,30 @@
                 const s = await d.gatt.connect();
                 const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
                 c = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-                document.getElementById('st').innerText = "🟢 ПІДКЛЮЧЕНО";
+                document.getElementById('st').innerText = "🟢 CONNECTED";
             } catch (e) { alert(e); }
         }
 
-        async function startScan() {
+        async function autoScan(header) {
             if(!c) return;
-            document.getElementById('sBtn').disabled = true;
-            
+            currentIdx = 1;
             scanner = setInterval(async () => {
-                // Перевіряємо, чи не в списку виключень
-                while(skip.includes(currentIdx)) {
-                    currentIdx++;
-                }
-
-                if(currentIdx > 255) {
-                    stopScan();
-                    alert("Сканування закінчено!");
-                    return;
-                }
-
-                document.getElementById('cur').innerText = currentIdx;
+                if(currentIdx > 100) { stopScan(); return; }
+                
+                document.getElementById('disp').innerText = `Пакет: [${header}, ${currentIdx}]`;
                 
                 try {
-                    // Шлемо [1, індекс, 255] для максимального ефекту
-                    await c.writeValueWithoutResponse(new Uint8Array([1, currentIdx, 255]));
+                    // Шлемо комбінацію заголовок + індекс
+                    await c.writeValueWithoutResponse(new Uint8Array([header, currentIdx]));
                 } catch (e) {}
 
                 currentIdx++;
-            }, 1500); // 1.5 секунди на кожну цифру, щоб ти встиг зреагувати
+            }, 300); // Швидкий перебір (0.3 сек), бо нам треба знайти хоч якийсь шорох
         }
 
         function stopScan() {
             clearInterval(scanner);
-            document.getElementById('sBtn').disabled = false;
-            document.getElementById('st').innerText = "🛑 ЗУПИНЕНО НА " + (currentIdx - 1);
+            document.getElementById('st').innerText = "🛑 ЗУПИНЕНО";
         }
     </script>
 </body>

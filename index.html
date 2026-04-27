@@ -3,27 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        body { background: #000; color: #fff; text-align: center; font-family: monospace; padding: 20px; }
-        .panel { border: 2px solid #ffaa00; padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; }
-        .btn { padding: 15px; margin: 10px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; font-size: 14px; }
-        .conn { background: #0066ff; color: white; }
-        .h18 { background: #ffaa00; color: black; }
-        .h19 { background: #ff5500; color: white; }
-        #disp { font-size: 40px; margin: 20px; color: #ffaa00; background: #222; padding: 10px; border-radius: 10px; }
+        body { background: #000; color: #ff00ff; text-align: center; font-family: monospace; padding: 20px; }
+        .panel { border: 2px solid #ff00ff; padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; }
+        .btn { padding: 15px; margin: 10px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; }
+        .conn { background: #0066ff; color: #fff; }
+        .start { background: #00ff00; color: #000; }
+        #disp { font-size: 32px; margin: 20px; color: #fff; }
     </style>
 </head>
 <body>
     <div class="panel">
-        <h3>JIVE: DEEP SCAN (H18/H19)</h3>
+        <h3>JIVE: UNLOCK & SCAN</h3>
         <div id="st">СТАТУС: OFF</div>
         <button class="btn conn" onclick="conn()">🔌 1. КОННЕКТ</button>
-        
-        <div id="disp">0</div>
-        
-        <button class="btn h18" onclick="runScan(18)">🚀 ТОЧНИЙ СКАН H18</button>
-        <button class="btn h19" onclick="runScan(19)">🚀 ТОЧНИЙ СКАН H19</button>
-        
-        <button class="btn" style="background:red; color:white; margin-top:20px;" onclick="stopScan()">🛑 СТОП</button>
+        <div id="disp">READY</div>
+        <button class="btn start" onclick="unlockAndRun()">🚀 РОЗБЛОКУВАТИ ТА СКАН</button>
+        <button class="btn" style="background:red; color:#fff" onclick="stopScan()">🛑 СТОП</button>
     </div>
 
     <script>
@@ -43,11 +38,19 @@
             } catch (e) { alert(e); }
         }
 
-        async function runScan(header) {
+        async function unlockAndRun() {
             if(!ch) return;
+            
+            // 1. Шлемо "Handshake" (команда пробудження)
+            try {
+                await ch.writeValueWithoutResponse(new Uint8Array([0xff, 0xff, 0xff]));
+                await new Promise(r => setTimeout(r, 200));
+                await ch.writeValueWithoutResponse(new Uint8Array([0x01, 0x01, 0x01]));
+            } catch(e) {}
+
             val = 1;
             clearInterval(scanner);
-            document.getElementById('st').innerText = "📡 ПЕРЕБІР H" + header;
+            document.getElementById('st').innerText = "📡 СКАН ПІСЛЯ UNLOCK";
 
             scanner = setInterval(async () => {
                 if(val > 255) { stopScan(); return; }
@@ -55,16 +58,16 @@
 
                 document.getElementById('disp').innerText = val;
                 try {
-                    // Шлемо 3-байтовий пакет на нових заголовках
-                    await ch.writeValueWithoutResponse(new Uint8Array([header, val, 1]));
+                    // Пробуємо стандартний Magic Motion пакет після розблокування
+                    await ch.writeValueWithoutResponse(new Uint8Array([1, val, 1]));
                 } catch (e) {}
                 val++; 
-            }, 150); 
+            }, 150);
         }
 
         function stopScan() {
             clearInterval(scanner);
-            document.getElementById('st').innerText = "🛑 ЗУПИНЕНО";
+            document.getElementById('st').innerText = "🛑 СТОП";
         }
     </script>
 </body>

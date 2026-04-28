@@ -3,84 +3,92 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        body { background: #111; color: #0f0; font-family: 'Courier New', monospace; text-align: center; padding: 20px; }
-        .card { border: 2px solid #0f0; padding: 20px; border-radius: 15px; display: inline-block; background: #000; box-shadow: 0 0 15px #0f0; }
-        button { background: #000; color: #0f0; border: 2px solid #0f0; padding: 10px 20px; margin: 5px; cursor: pointer; font-weight: bold; border-radius: 5px; }
-        button:hover { background: #0f0; color: #000; }
-        .slider { width: 100%; margin: 20px 0; accent-color: #0f0; }
-        #st { color: #ff0; margin-bottom: 10px; }
+        body { background: #050505; color: #00ff00; font-family: 'Consolas', monospace; text-align: center; padding: 20px; }
+        .console { border: 1px solid #00ff00; background: #000; padding: 15px; height: 200px; overflow-y: scroll; text-align: left; font-size: 12px; margin-bottom: 10px; }
+        button { background: #111; color: #00ff00; border: 1px solid #00ff00; padding: 10px; margin: 5px; cursor: pointer; width: 180px; }
+        button:hover { background: #00ff00; color: #000; }
+        .active { background: #ff00ff; border-color: #ff00ff; color: #fff; }
     </style>
 </head>
 <body>
-    <div class="card">
-        <h3>JIVE PC CONTROL</h3>
-        <div id="st">СТАТУС: ТРЕБА ПІДКЛЮЧИТИСЬ</div>
-        
-        <button onclick="connect()">🔌 ПІДКЛЮЧИТИ JIVE</button>
-        
-        <div style="margin: 20px 0; border-top: 1px solid #333; padding-top: 10px;">
-            <p>ВІБРАЦІЯ: <span id="vNum">0</span></p>
-            <input type="range" min="0" max="255" value="0" class="slider" id="vS" oninput="send()">
-        </div>
-
-        <p>ТОЛКАЧКИ (РЕЖИМИ):</p>
-        <div id="modes">
-            <button onclick="setM(0)">OFF</button>
-            <button onclick="setM(1)">Mode 1</button>
-            <button onclick="setM(2)">Mode 2</button>
-            <button onclick="setM(3)">Mode 3</button>
-            <button onclick="setM(5)">Mode 5</button>
-            <button onclick="setM(11)">Mode 11</button>
-        </div>
-
-        <br>
-        <button style="border-color: red; color: red;" onclick="stopAll()">🛑 ТОРМОЗ</button>
-    </div>
+    <h3>JIVE DEEP ANALYZER</h3>
+    <div class="console" id="log">ПОЧАТОК РОБОТИ... ЧЕКАЮ КОННЕКТ</div>
+    
+    <button onclick="conn()">🔌 1. КОННЕКТ</button>
+    <hr style="border-color: #222">
+    
+    <p>СПЕЦІАЛЬНІ ПАКЕТИ (для Jive):</p>
+    <button onclick="sendSet(1, 100, 5)">📦 TEST 5-BYTE (H1)</button>
+    <button onclick="sendSet(11, 100, 3)">📦 TEST 3-BYTE (H11)</button>
+    <button onclick="sendSet(16, 100, 3)">📦 TEST 3-BYTE (H16)</button>
+    
+    <p>АВТО-СКАНЕР (ПЕРЕБІР):</p>
+    <button id="scanBtn" onclick="toggleScan()" style="background: #200; border-color: red;">🔍 ЗАПУСТИТИ СКАН</button>
+    
+    <br><br>
+    <button onclick="stopAll()" style="color: red; border-color: red;">🛑 TOTAL STOP</button>
 
     <script>
-        let ch;
-        let curM = 0;
+        let ch, scanner;
+        let sVal = 0;
+        const l = document.getElementById('log');
 
-        async function connect() {
+        function log(msg) {
+            l.innerHTML += `<div>> ${msg}</div>`;
+            l.scrollTop = l.scrollHeight;
+        }
+
+        async function conn() {
             try {
-                const device = await navigator.bluetooth.requestDevice({
+                const d = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
                     optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
                 });
-                const server = await device.gatt.connect();
-                const service = await server.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
-                ch = await service.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-                
-                document.getElementById('st').innerText = "🟢 ПІДКЛЮЧЕНО: " + device.name;
-                // Примусовий стоп при підключенні, щоб не толкав одразу
-                await ch.writeValueWithoutResponse(new Uint8Array([1, 0, 0]));
-            } catch (e) {
-                alert("Помилка: " + e.message);
+                const s = await d.gatt.connect();
+                const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
+                ch = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
+                log("ГАТТ ПІДКЛЮЧЕНО: " + d.name);
+            } catch (e) { log("ПОМИЛКА: " + e.message); }
+        }
+
+        async function sendSet(h, v, len) {
+            if (!ch) return log("СПОЧАТКУ КОННЕКТ!");
+            let arr;
+            if (len === 5) arr = new Uint8Array([h, 1, v, 0, 0]); // 5-байтовий формат
+            else arr = new Uint8Array([h, 1, v]); // 3-байтовий формат
+            
+            log(`ШЛЮ: [${arr.join(', ')}]`);
+            try { await ch.writeValueWithoutResponse(arr); } catch(e) {}
+        }
+
+        function toggleScan() {
+            if (scanner) {
+                clearInterval(scanner);
+                scanner = null;
+                log("СКАНЕР ЗУПИНЕНО");
+                document.getElementById('scanBtn').classList.remove('active');
+            } else {
+                sVal = 0;
+                document.getElementById('scanBtn').classList.add('active');
+                log("СТАРТ ПЕРЕБОРУ...");
+                scanner = setInterval(async () => {
+                    if (sVal > 255) { toggleScan(); return; }
+                    log("ПРОБА SPEED: " + sVal);
+                    try {
+                        // Шлемо комбо на різних заголовках одночасно
+                        await ch.writeValueWithoutResponse(new Uint8Array([1, 1, sVal]));
+                        await new Promise(r => setTimeout(r, 50));
+                        await ch.writeValueWithoutResponse(new Uint8Array([11, 1, sVal]));
+                    } catch(e) {}
+                    sVal += 5;
+                }, 300);
             }
         }
 
-        async function setM(m) {
-            curM = m;
-            await send();
-        }
-
-        async function send() {
-            if (!ch) return;
-            let v = parseInt(document.getElementById('vS').value);
-            document.getElementById('vNum').innerText = v;
-            
-            // Байт 2 - толкачки (твої графіки), Байт 3 - вібро (плавно)
-            try {
-                await ch.writeValueWithoutResponse(new Uint8Array([1, curM, v]));
-            } catch (e) {}
-        }
-
         async function stopAll() {
-            if (!ch) return;
-            curM = 0;
-            document.getElementById('vS').value = 0;
-            document.getElementById('vNum').innerText = 0;
-            await ch.writeValueWithoutResponse(new Uint8Array([1, 0, 0]));
+            if (scanner) toggleScan();
+            if (ch) await ch.writeValueWithoutResponse(new Uint8Array([1, 0, 0]));
+            log("ВСЕ ВИМКНЕНО");
         }
     </script>
 </body>

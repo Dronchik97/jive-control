@@ -2,78 +2,67 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JIVE MASTER CONTROL</title>
     <style>
-        body { background: #000; color: #00ffcc; text-align: center; font-family: sans-serif; padding: 20px; }
-        .panel { border: 2px solid #00ffcc; padding: 20px; border-radius: 15px; max-width: 400px; margin: auto; }
-        .slider-box { margin: 20px 0; }
-        input[type=range] { width: 100%; cursor: pointer; }
-        .label { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 5px; }
-        .btn { padding: 15px; margin: 10px 0; border: none; border-radius: 8px; width: 100%; cursor: pointer; font-weight: bold; background: #0066ff; color: white; }
+        body { background: #0b0e14; color: #00ffcc; text-align: center; font-family: 'Segoe UI', sans-serif; padding: 20px; }
+        .panel { border: 2px solid #00ffcc; padding: 25px; border-radius: 20px; max-width: 420px; margin: auto; box-shadow: 0 0 20px rgba(0,255,204,0.2); }
+        .st { margin-bottom: 20px; font-weight: bold; font-size: 14px; color: #ff00ff; }
+        .btn { padding: 15px; margin: 10px 0; border: none; border-radius: 10px; width: 100%; cursor: pointer; font-weight: bold; font-size: 16px; transition: 0.3s; }
+        .conn { background: #0066ff; color: white; }
+        .conn:hover { background: #0052cc; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 20px 0; }
+        .btn-mode { background: #1a1f26; color: #00ffcc; border: 1px solid #00ffcc; padding: 12px; border-radius: 8px; cursor: pointer; }
+        .btn-mode.active { background: #00ffcc; color: #000; }
+        .slider-box { margin: 30px 0; background: #1a1f26; padding: 15px; border-radius: 12px; }
+        input[type=range] { width: 100%; height: 10px; border-radius: 5px; background: #333; outline: none; -webkit-appearance: none; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 25px; height: 25px; background: #ff00ff; border-radius: 50%; cursor: pointer; }
+        .label { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
     </style>
 </head>
 <body>
     <div class="panel">
-        <h3>JIVE: DOUBLE COMMAND</h3>
-        <div id="st">СТАТУС: OFF</div>
-        <button class="btn" onclick="conn()">🔌 1. КОННЕКТ</button>
+        <h2 style="margin-top:0">JIVE CONTROL 2.0</h2>
+        <div id="st" class="st">СТАТУС: ВІДКЛЮЧЕНО</div>
         
-        <div class="slider-box">
-            <div class="label"><span>ТОЛКАЧКИ (Byte 2):</span> <span id="v1">0</span></div>
-            <input type="range" min="0" max="255" value="0" id="s1" oninput="update()">
-        </div>
+        <button class="btn conn" onclick="conn()">🔌 ПІДКЛЮЧИТИСЬ (BLUETOOTH)</button>
 
         <div class="slider-box">
-            <div class="label"><span>ВІБРАЦІЯ (Byte 3):</span> <span id="v2">0</span></div>
-            <input type="range" min="0" max="255" value="0" id="s2" oninput="update()">
+            <div class="label">
+                <span>ВІБРАЦІЯ (ПЛАВНО)</span>
+                <span id="vVal" style="color:#ff00ff">0</span>
+            </div>
+            <input type="range" min="0" max="255" value="0" id="vibeSlider" oninput="updateControls()">
         </div>
 
-        <button class="btn" style="background:red" onclick="stop()">🛑 ВСЕ ВИМКНУТИ</button>
+        <p style="text-align:left; font-size:12px; margin-bottom:10px">ТОЛКАЧКИ (ГРАФІКИ):</p>
+        <div class="grid">
+            <button class="btn-mode" onclick="setMode(1)">M1</button>
+            <button class="btn-mode" onclick="setMode(2)">M2</button>
+            <button class="btn-mode" onclick="setMode(3)">M3</button>
+            <button class="btn-mode" onclick="setMode(4)">M4</button>
+            <button class="btn-mode" onclick="setMode(5)">M5</button>
+            <button class="btn-mode" onclick="setMode(6)">M6</button>
+            <button class="btn-mode" onclick="setMode(7)">M7</button>
+            <button class="btn-mode" onclick="setMode(9)">M9</button>
+            <button class="btn-mode" onclick="setMode(11)">M11</button>
+        </div>
+
+        <button class="btn" style="background:#ff3333; color:white" onclick="stopAll()">🛑 ЗУПИНИТИ ВСЕ</button>
+        <p style="font-size:10px; color:#555; margin-top:15px">Blacklist: 8, 10 | Device: Jive</p>
     </div>
 
     <script>
-        let ch;
+        let char;
+        let currentMode = 0;
         const blackList = [8, 10];
 
         async function conn() {
             try {
-                const d = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true, optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
+                const device = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
                 });
-                const s = await d.gatt.connect();
-                const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
-                ch = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-                document.getElementById('st').innerText = "🟢 ПІДКЛЮЧЕНО";
-                // Шлемо "Handshake"
-                await ch.writeValueWithoutResponse(new Uint8Array([0xff, 0xff, 0xff]));
-            } catch (e) { alert(e); }
-        }
-
-        async function update() {
-            if(!ch) return;
-            let val1 = parseInt(document.getElementById('s1').value);
-            let val2 = parseInt(document.getElementById('s2').value);
-
-            // Авто-ігнор 8 і 10
-            if(blackList.includes(val1)) val1++;
-            if(blackList.includes(val2)) val2++;
-
-            document.getElementById('v1').innerText = val1;
-            document.getElementById('v2').innerText = val2;
-
-            try {
-                // Шлемо пакет [Header, Thrust, Vibe]
-                await ch.writeValueWithoutResponse(new Uint8Array([1, val1, val2]));
-            } catch (e) {}
-        }
-
-        async function stop() {
-            if(!ch) return;
-            document.getElementById('s1').value = 0;
-            document.getElementById('s2').value = 0;
-            document.getElementById('v1').innerText = 0;
-            document.getElementById('v2').innerText = 0;
-            await ch.writeValueWithoutResponse(new Uint8Array([1, 0, 0]));
-        }
-    </script>
-</body>
-</html>
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
+                char = await service.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8

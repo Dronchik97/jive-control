@@ -1,52 +1,80 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <style>
-        body { background: #1a1a1a; color: #00ff00; font-family: monospace; padding: 20px; }
-        button { background: #000; color: #00ff00; border: 1px solid #00ff00; padding: 15px; width: 100%; margin: 5px 0; cursor: pointer; }
-        .control { margin: 20px 0; padding: 10px; border: 1px solid #333; }
+        body { background: #000; color: #00ff00; font-family: 'Courier New', monospace; text-align: center; padding: 20px; }
+        .box { border: 2px solid #00ff00; padding: 20px; border-radius: 15px; background: #050505; display: inline-block; }
+        button { background: #000; color: #00ff00; border: 1px solid #00ff00; padding: 12px; margin: 5px; cursor: pointer; width: 160px; font-weight: bold; }
+        button:hover { background: #00ff00; color: #000; }
+        input[type=range] { width: 100%; height: 25px; accent-color: #00ff00; }
+        #log { font-size: 10px; color: #666; margin-top: 10px; height: 40px; overflow: hidden; }
     </style>
 </head>
 <body>
-    <h3>JIVE: SILENT SCANNER</h3>
-    <button onclick="connect()">🔌 1. ТИХИЙ КОННЕКТ</button>
-    <button onclick="stopAll()" style="color:red; border-color:red">🛑 2. ПРИМУСОВИЙ СТОП</button>
+    <div class="box">
+        <h3>JIVE: CRC CHECK-SUM MODE</h3>
+        <button onclick="conn()">🔌 1. CONNECT BT</button>
+        
+        <div style="margin: 20px 0;">
+            <p>ВІБРО: <span id="vN">0</span></p>
+            <input type="range" min="0" max="255" value="0" id="vS" oninput="send()">
+        </div>
 
-    <div class="control">
-        <p>СКАН ЗАГОЛОВКІВ (Header):</p>
-        <button onclick="scanHeaders()">🚀 ПОЧАТИ СКАН (Header 1-255)</button>
-        <p id="currH">Заголовок: 0</p>
+        <p>РЕЖИМИ ТОЛКАЧОК:</p>
+        <button onclick="setM(1)">MODE 1</button>
+        <button onclick="setM(2)">MODE 2</button>
+        <button onclick="setM(3)">MODE 3</button>
+        
+        <br><br>
+        <button style="border-color: red; color: red;" onclick="stop()">🛑 STOP</button>
+        <div id="log"></div>
     </div>
 
     <script>
         let ch;
-        async function connect() {
-            const dev = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true,
-                optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
-            });
-            const s = await dev.gatt.connect();
-            const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
-            ch = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-            alert("Підключено! Не чіпай нічого, він має мовчати.");
+        let mode = 0;
+
+        async function conn() {
+            try {
+                const d = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
+                });
+                const s = await d.gatt.connect();
+                const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
+                ch = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
+                document.getElementById('log').innerText = "Підключено до: " + d.name;
+            } catch (e) { alert(e.message); }
         }
 
-        async function stopAll() {
-            // Шлемо всі можливі варіанти "Стоп"
-            await ch.writeValueWithoutResponse(new Uint8Array([1, 0, 0]));
-            await ch.writeValueWithoutResponse(new Uint8Array([0, 0, 0]));
-            await ch.writeValueWithoutResponse(new Uint8Array([11, 0, 0]));
+        function setM(m) { mode = m; send(); }
+
+        async function send() {
+            if (!ch) return;
+            let v = parseInt(document.getElementById('vS').value);
+            document.getElementById('vN').innerText = v;
+
+            // Header=1, Mode=m, Speed=v
+            // Четвертий байт - це XOR або SUM для перевірки
+            let head = 1;
+            let crc = (head + mode + v) & 0xFF; 
+            
+            let data = new Uint8Array([head, mode, v, crc]);
+            
+            document.getElementById('log').innerText = "Шлю пакет: " + Array.from(data).join(', ');
+
+            try {
+                // Шлемо 4 байти замість 3
+                await ch.writeValueWithoutResponse(data);
+            } catch (e) { console.log(e); }
         }
 
-        async function scanHeaders() {
-            // Перебір заголовків від 0 до 255
-            for(let h = 0; h < 256; h++) {
-                document.getElementById('currH').innerText = "Заголовок: " + h;
-                try {
-                    // Шлемо заголовок + 0 швидкість + 0 режим
-                    await ch.writeValueWithoutResponse(new Uint8Array([h, 0, 0]));
-                    await new Promise(r => setTimeout(r, 100)); // Затримка 100мс
-                } catch(e) {}
+        async function stop() {
+            if (ch) {
+                mode = 0;
+                document.getElementById('vS').value = 0;
+                await ch.writeValueWithoutResponse(new Uint8Array([1, 0, 0, 1]));
             }
         }
     </script>

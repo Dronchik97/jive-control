@@ -13,20 +13,17 @@
     </style>
 </head>
 <body>
-    <h2>ANDRII PUSHER CONTROL v5.0</h2>
+    <h2>PUSHER LIVE v5.1</h2>
     
     <button onclick="conn()" style="width: 100%; max-width: 310px; border-width: 3px;">🔌 CONNECT</button>
-    <button onclick="disconnectDevice()" style="width: 100%; max-width: 310px; border-color: #f0f; color: #f0f;">🚫 DISCONNECT</button>
+    <button onclick="hardDisconnect()" style="width: 100%; max-width: 310px; border-color: #f0f; color: #f0f;">🚫 FORCE DISCONNECT</button>
     
     <div id="out" class="status-box">Disconnected</div>
 
     <div class="group" style="border-color: #0f0;">
         <p style="font-weight: bold;">🎮 LIVE CONTROL (11, 8, V)</p>
-        
         <button onclick="test([11, 8, 32])" style="width: 100%; max-width: 280px; background: #050;">▶️ ПУСК (0x20)</button>
-        
         <input type="range" id="pusherSlider" min="32" max="100" value="64">
-        
         <div style="font-size: 20px; margin-top: 10px;">
             Power: <span id="pVal">64</span> (Hex: <span id="hVal">0x40</span>)
         </div>
@@ -41,20 +38,15 @@
         const hVal = document.getElementById('hVal');
         const out = document.getElementById('out');
 
-        // ЖИВА РЕАКЦІЯ ПОВЗУНКА
         slider.oninput = async function() {
             let speed = parseInt(this.value);
             pVal.innerText = speed;
             hVal.innerText = "0x" + speed.toString(16).toUpperCase();
             
-            // Відправляємо команду відразу при русі
             if (ch) {
                 try {
-                    const data = new Uint8Array([11, 8, speed]);
-                    await ch.writeValueWithoutResponse(data);
-                } catch (e) {
-                    console.log("Швидка передача..."); 
-                }
+                    await ch.writeValueWithoutResponse(new Uint8Array([11, 8, speed]));
+                } catch (e) { console.log("Too fast..."); }
             }
         };
 
@@ -64,40 +56,33 @@
                     acceptAllDevices: true,
                     optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
                 });
-                out.innerText = "Connecting to " + device.name + "...";
-                
                 const s = await device.gatt.connect();
                 const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
                 ch = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-                
                 out.innerText = "✅ Connected!";
             } catch (e) {
                 out.innerText = "❌ Error: " + e.message;
             }
         }
 
-        async function disconnectDevice() {
+        async function hardDisconnect() {
             if (device && device.gatt.connected) {
+                out.innerText = "Killing connection...";
                 await device.gatt.disconnect();
-                ch = null;
-                out.innerText = "🔌 Disconnected manually";
-            } else {
-                out.innerText = "Not connected";
             }
+            // Жорсткий рефреш сторінки, шоб очистити Bluetooth стек браузера
+            setTimeout(() => { window.location.reload(); }, 500);
         }
 
         async function test(arr) {
-            if (!ch) return alert("Спочатку підключись!");
-            const data = new Uint8Array(arr);
-            await ch.writeValueWithoutResponse(data);
+            if (!ch) return;
+            await ch.writeValueWithoutResponse(new Uint8Array(arr));
             out.innerText = "Sent: " + arr;
         }
 
         async function stop() {
-            if (!ch) return;
-            // Зупиняємо толкачку
-            await ch.writeValueWithoutResponse(new Uint8Array([11, 8, 0]));
-            out.innerText = "🛑 All Stopped";
+            if (ch) await ch.writeValueWithoutResponse(new Uint8Array([11, 8, 0]));
+            out.innerText = "🛑 Stopped";
         }
     </script>
 </body>

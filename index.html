@@ -6,11 +6,11 @@
     <style>
         body { font-family: sans-serif; text-align: center; padding: 20px; background: #121212; color: white; }
         button { padding: 20px; font-size: 18px; cursor: pointer; border-radius: 10px; border: none; background: #27ae60; color: white; margin: 10px; width: 90%; }
-        #status { color: #f1c40f; margin: 15px; border: 1px solid #333; padding: 10px; font-size: 14px; text-align: left; white-space: pre-wrap; }
+        #status { color: #f1c40f; margin: 15px; border: 1px solid #333; padding: 10px; font-size: 14px; }
     </style>
 </head>
 <body>
-    <h2>Пульт для Андрія 🚀</h2>
+    <h2>Пульт для Андрія (Final) 🚀</h2>
     <div id="status">Статус: Тисни ПІДКЛЮЧИТИСЬ</div>
     
     <button onclick="connect()">1. ПІДКЛЮЧИТИСЬ</button>
@@ -23,6 +23,14 @@
 
     <script>
         let characteristic;
+        // Спробуємо додати всі варіанти сервісів Magic Motion
+        const OPTIONAL_SERVICES = [
+            "0000ae00-0000-1000-8000-00805f9b34fb",
+            "0000ae01-0000-1000-8000-00805f9b34fb",
+            "0000ae02-0000-1000-8000-00805f9b34fb",
+            "0000ae03-0000-1000-8000-00805f9b34fb",
+            "0000fee9-0000-1000-8000-00805f9b34fb"
+        ];
         const TARGET_CHAR = "78667579-7b48-43db-b8c5-7928a6b0a335";
 
         document.getElementById('speedRange').oninput = function() {
@@ -32,55 +40,41 @@
         async function connect() {
             const status = document.getElementById('status');
             try {
-                status.innerText = "Вибирай пристрій...";
                 const device = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
-                    // Додаємо ВСІ можливі сервіси, які можуть ховати нашу характеристику
-                    optionalServices: [
-                        "0000ae00-0000-1000-8000-00805f9b34fb",
-                        "0000ae01-0000-1000-8000-00805f9b34fb",
-                        "0000fee9-0000-1000-8000-00805f9b34fb",
-                        "3d3cbc0e-f76b-11e3-8fcd-b2227cce2b54",
-                        "0000180a-0000-1000-8000-00805f9b34fb"
-                    ]
+                    optionalServices: OPTIONAL_SERVICES
                 });
 
-                status.innerText = "З'єднуюсь...";
+                status.innerText = "З'єднуюсь з " + device.name + "...";
                 const server = await device.gatt.connect();
                 
-                status.innerText = "Сканую сервіси...";
-                const services = await server.getPrimaryServices();
+                status.innerText = "Шукаю характеристику...";
                 
-                status.innerText = "Знайдено сервісів: " + services.length + "\nШукаю потрібну характеристику...";
-
-                for (const service of services) {
-                    console.log("Дивлюсь сервіс:", service.uuid);
+                // Пробуємо по черзі кожен сервіс зі списку
+                for (const sUuid of OPTIONAL_SERVICES) {
                     try {
-                        const chars = await service.getCharacteristics();
-                        for (const c of chars) {
-                            if (c.uuid.toLowerCase() === TARGET_CHAR.toLowerCase()) {
-                                characteristic = c;
-                                status.innerText = "ЗНАЙШОВ! ✅\nСервіс: " + service.uuid + "\nМожна лупити!";
-                                return;
-                            }
+                        const service = await server.getPrimaryService(sUuid);
+                        characteristic = await service.getCharacteristic(TARGET_CHAR);
+                        if (characteristic) {
+                            status.innerText = "✅ ЗНАЙШОВ! Сервіс: " + sUuid.substring(0,8);
+                            return;
                         }
                     } catch (e) { continue; }
                 }
 
-                if (!characteristic) {
-                    status.innerText = "❌ Збій: Характеристика не знайдена.\nСпробуй ще раз, або іграшка заснула.";
-                }
+                status.innerText = "❌ Не знайшов у списку сервісів. Спробуй ще раз.";
             } catch (error) {
                 status.innerText = "❌ Помилка: " + error.message;
             }
         }
 
         async function sendCommand() {
-            if (!characteristic) return alert("Спочатку підключись!");
+            if (!characteristic) return alert("Не підключено!");
             try {
                 let speed = parseInt(document.getElementById('speedRange').value);
+                // Наша команда: 11, 8, Швидкість
                 await characteristic.writeValue(new Uint8Array([0x0B, 0x08, speed]));
-            } catch (e) { alert("Помилка запису: " + e.message); }
+            } catch (e) { alert("Збій запису: " + e.message); }
         }
 
         async function stopDevice() {

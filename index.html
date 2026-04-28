@@ -1,16 +1,12 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Andrii Pusher Final</title>
+    <title>Andrii Pusher Final Fix</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { font-family: sans-serif; text-align: center; padding: 20px; background: #121212; color: white; }
-        button { 
-            padding: 20px; font-size: 18px; cursor: pointer; 
-            border-radius: 10px; border: none; background: #27ae60; color: white;
-            margin: 10px; width: 90%;
-        }
-        #status { color: #f1c40f; margin: 15px; border: 1px solid #333; padding: 10px; font-family: monospace; }
+        button { padding: 20px; font-size: 18px; cursor: pointer; border-radius: 10px; border: none; background: #27ae60; color: white; margin: 10px; width: 90%; }
+        #status { color: #f1c40f; margin: 15px; border: 1px solid #333; padding: 10px; font-size: 14px; text-align: left; white-space: pre-wrap; }
     </style>
 </head>
 <body>
@@ -22,7 +18,7 @@
     <input type="range" id="speedRange" min="0" max="255" value="180" style="width:80%">
     <p>Швидкість: <span id="speedVal">180</span></p>
     
-    <button onclick="sendCommand()">2. ТИСНИ — ТОЛКАЙ!</button>
+    <button onclick="sendCommand()">2. ЗАПУСТИТИ</button>
     <button style="background:#c0392b" onclick="stopDevice()">3. СТОП</button>
 
     <script>
@@ -34,50 +30,57 @@
         };
 
         async function connect() {
+            const status = document.getElementById('status');
             try {
+                status.innerText = "Вибирай пристрій...";
                 const device = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
-                    // Тут ми не кажемо який сервіс шукати, ми кажемо ЯКІ дозволити
+                    // Додаємо ВСІ можливі сервіси, які можуть ховати нашу характеристику
                     optionalServices: [
                         "0000ae00-0000-1000-8000-00805f9b34fb",
                         "0000ae01-0000-1000-8000-00805f9b34fb",
-                        "3d3cbc0e-f76b-11e3-8fcd-b2227cce2b54"
+                        "0000fee9-0000-1000-8000-00805f9b34fb",
+                        "3d3cbc0e-f76b-11e3-8fcd-b2227cce2b54",
+                        "0000180a-0000-1000-8000-00805f9b34fb"
                     ]
                 });
 
+                status.innerText = "З'єднуюсь...";
                 const server = await device.gatt.connect();
-                document.getElementById('status').innerText = "Шукаю сервіси...";
-
-                // Магія: перебираємо всі сервіси пристрою автоматично
+                
+                status.innerText = "Сканую сервіси...";
                 const services = await server.getPrimaryServices();
                 
+                status.innerText = "Знайдено сервісів: " + services.length + "\nШукаю потрібну характеристику...";
+
                 for (const service of services) {
+                    console.log("Дивлюсь сервіс:", service.uuid);
                     try {
                         const chars = await service.getCharacteristics();
-                        const found = chars.find(c => c.uuid === TARGET_CHAR);
-                        if (found) {
-                            characteristic = found;
-                            document.getElementById('status').innerText = "ЗНАЙШОВ! Сервіс: " + service.uuid.substring(0,8);
-                            break;
+                        for (const c of chars) {
+                            if (c.uuid.toLowerCase() === TARGET_CHAR.toLowerCase()) {
+                                characteristic = c;
+                                status.innerText = "ЗНАЙШОВ! ✅\nСервіс: " + service.uuid + "\nМожна лупити!";
+                                return;
+                            }
                         }
                     } catch (e) { continue; }
                 }
 
                 if (!characteristic) {
-                    throw new Error("Характеристика не знайдена в жодному сервісі!");
+                    status.innerText = "❌ Збій: Характеристика не знайдена.\nСпробуй ще раз, або іграшка заснула.";
                 }
-
-                document.getElementById('status').innerText += " ✅ ГОТОВО";
             } catch (error) {
-                document.getElementById('status').innerText = "Збій: " + error.message;
+                status.innerText = "❌ Помилка: " + error.message;
             }
         }
 
         async function sendCommand() {
             if (!characteristic) return alert("Спочатку підключись!");
-            let speed = parseInt(document.getElementById('speedRange').value);
-            // 0B (заголовок), 08 (толкачка), швидкість
-            await characteristic.writeValue(new Uint8Array([0x0B, 0x08, speed]));
+            try {
+                let speed = parseInt(document.getElementById('speedRange').value);
+                await characteristic.writeValue(new Uint8Array([0x0B, 0x08, speed]));
+            } catch (e) { alert("Помилка запису: " + e.message); }
         }
 
         async function stopDevice() {

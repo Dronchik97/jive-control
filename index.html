@@ -1,36 +1,32 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Pusher Control</title>
+    <title>Pusher FIX</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { font-family: sans-serif; text-align: center; padding: 20px; background: #121212; color: white; }
         button { padding: 20px; font-size: 18px; cursor: pointer; border-radius: 10px; border: none; background: #27ae60; color: white; margin: 10px; width: 90%; }
         .stop { background: #c0392b !important; }
         input[type=range] { width: 80%; height: 30px; margin: 20px 0; }
-        #status { color: #f1c40f; margin: 15px; border: 1px solid #333; padding: 10px; }
+        #status { color: #f1c40f; margin: 15px; border: 1px solid #333; padding: 10px; font-size: 12px; }
     </style>
 </head>
 <body>
     <h2>Толкачка для Андрія 🚀</h2>
-    <div id="status">Статус: Натисніть "ПІДКЛЮЧИТИСЬ"</div>
+    <div id="status">Тисни "ПІДКЛЮЧИТИСЬ"</div>
     
     <button onclick="connect()">1. ПІДКЛЮЧИТИСЬ</button>
-    
-    <hr style="border: 0.5px solid #333; margin: 20px;">
     
     <p>Швидкість (Hex: <span id="hexVal">0x64</span>):</p>
     <input type="range" id="speedSlider" min="32" max="100" value="100">
     <div id="speedVal" style="font-size: 24px;">100</div>
     
-    <br>
     <button onclick="sendPush()">2. ЗАПУСТИТИ</button>
     <button class="stop" onclick="stopPush()">3. СТОП</button>
 
     <script>
         let char;
-        const SERVICE_UUID = "0000ae00-0000-1000-8000-00805f9b34fb";
-        const CHAR_UUID = "78667579-7b48-43db-b8c5-7928a6b0a335";
+        const TARGET_CHAR = "78667579-7b48-43db-b8c5-7928a6b0a335";
 
         const slider = document.getElementById('speedSlider');
         const speedDisplay = document.getElementById('speedVal');
@@ -43,25 +39,39 @@
 
         async function connect() {
             try {
+                // Визиваємо меню Bluetooth
                 const device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: [SERVICE_UUID]
+                    acceptAllDevices: true
                 });
+
                 const server = await device.gatt.connect();
-                const service = await server.getPrimaryService(SERVICE_UUID);
-                char = await service.getCharacteristic(CHAR_UUID);
-                document.getElementById('status').innerText = "✅ ПІДКЛЮЧЕНО ДО: " + device.name;
+                document.getElementById('status').innerText = "Шукаю сервіс...";
+
+                // Магія: отримуємо ВСІ сервіси, які є
+                const services = await server.getPrimaryServices();
+                
+                for (let service of services) {
+                    try {
+                        char = await service.getCharacteristic(TARGET_CHAR);
+                        if (char) {
+                            document.getElementById('status').innerText = "✅ ГОТОВО! Знайшов у: " + service.uuid.substring(0,8);
+                            return;
+                        }
+                    } catch (e) { continue; }
+                }
+
+                if (!char) throw new Error("Не знайшов характеристику.");
             } catch (e) {
                 document.getElementById('status').innerText = "❌ Помилка: " + e.message;
+                console.error(e);
             }
         }
 
         async function sendPush() {
-            if (!char) return alert("Спочатку підключись!");
+            if (!char) return alert("Не підключено!");
             let val = parseInt(slider.value);
-            // Твоя команда: 0B (11), 08 (толкачка), швидкість (val)
-            let data = new Uint8Array([0x0B, 0x08, val]);
-            await char.writeValue(data);
+            // 0B (11), 08 (канал), швидкість
+            await char.writeValue(new Uint8Array([0x0B, 0x08, val]));
         }
 
         async function stopPush() {

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Andrii Pusher Fix</title>
+    <title>Andrii Pusher Final</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { font-family: sans-serif; text-align: center; padding: 20px; background: #121212; color: white; }
@@ -10,29 +10,24 @@
             border-radius: 10px; border: none; background: #27ae60; color: white;
             margin: 10px; width: 90%;
         }
-        .stop { background: #c0392b !important; }
-        #status { color: #f1c40f; margin: 15px; border: 1px solid #333; padding: 10px; }
+        #status { color: #f1c40f; margin: 15px; border: 1px solid #333; padding: 10px; font-family: monospace; }
     </style>
 </head>
 <body>
-    <h2>Пульт для Андрія (FIX) 🚀</h2>
-    <div id="status">Статус: Тисни кнопку "1"</div>
+    <h2>Пульт для Андрія 🚀</h2>
+    <div id="status">Статус: Тисни ПІДКЛЮЧИТИСЬ</div>
     
-    <button onclick="connect()">1. ЗНАЙТИ ТА ПІДКЛЮЧИТИ</button>
+    <button onclick="connect()">1. ПІДКЛЮЧИТИСЬ</button>
     <br>
-    <input type="range" id="speedRange" min="0" max="255" value="150" style="width:80%">
-    <p>Швидкість: <span id="speedVal">150</span></p>
+    <input type="range" id="speedRange" min="0" max="255" value="180" style="width:80%">
+    <p>Швидкість: <span id="speedVal">180</span></p>
     
-    <button onclick="sendCommand()">2. ЗАПУСТИТИ</button>
-    <button class="stop" onclick="stopDevice()">3. СТОП</button>
+    <button onclick="sendCommand()">2. ТИСНИ — ТОЛКАЙ!</button>
+    <button style="background:#c0392b" onclick="stopDevice()">3. СТОП</button>
 
     <script>
-        let device, characteristic;
-        
-        // Список сервісів, які ми бачили в тебе
-        const MAIN_SERVICE = "0000ae00-0000-1000-8000-00805f9b34fb";
-        const CHAR_UUID = "78667579-7b48-43db-b8c5-7928a6b0a335";
-        const ALERT_SERVICE = "3d3cbc0e-f76b-11e3-8fcd-b2227cce2b54";
+        let characteristic;
+        const TARGET_CHAR = "78667579-7b48-43db-b8c5-7928a6b0a335";
 
         document.getElementById('speedRange').oninput = function() {
             document.getElementById('speedVal').innerText = this.value;
@@ -40,41 +35,53 @@
 
         async function connect() {
             try {
-                // Визиваємо меню Bluetooth
-                device = await navigator.bluetooth.requestDevice({
-                    // Дозволяємо бачити всі пристрої
+                const device = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
-                    // ОБОВ'ЯЗКОВО вказуємо всі сервіси, до яких хочемо доступ
-                    optionalServices: [MAIN_SERVICE, ALERT_SERVICE, '0000ae01-0000-1000-8000-00805f9b34fb']
+                    // Тут ми не кажемо який сервіс шукати, ми кажемо ЯКІ дозволити
+                    optionalServices: [
+                        "0000ae00-0000-1000-8000-00805f9b34fb",
+                        "0000ae01-0000-1000-8000-00805f9b34fb",
+                        "3d3cbc0e-f76b-11e3-8fcd-b2227cce2b54"
+                    ]
                 });
 
                 const server = await device.gatt.connect();
-                document.getElementById('status').innerText = "Підключено до сервера...";
+                document.getElementById('status').innerText = "Шукаю сервіси...";
 
-                // Пробуємо отримати сервіс
-                const service = await server.getPrimaryService(MAIN_SERVICE);
-                characteristic = await service.getCharacteristic(CHAR_UUID);
+                // Магія: перебираємо всі сервіси пристрою автоматично
+                const services = await server.getPrimaryServices();
+                
+                for (const service of services) {
+                    try {
+                        const chars = await service.getCharacteristics();
+                        const found = chars.find(c => c.uuid === TARGET_CHAR);
+                        if (found) {
+                            characteristic = found;
+                            document.getElementById('status').innerText = "ЗНАЙШОВ! Сервіс: " + service.uuid.substring(0,8);
+                            break;
+                        }
+                    } catch (e) { continue; }
+                }
 
-                document.getElementById('status').innerText = "ГОТОВО! Можна толкати ✅";
-                alert("Знайшов: " + device.name);
+                if (!characteristic) {
+                    throw new Error("Характеристика не знайдена в жодному сервісі!");
+                }
+
+                document.getElementById('status').innerText += " ✅ ГОТОВО";
             } catch (error) {
-                alert("Помилка: " + error.message);
                 document.getElementById('status').innerText = "Збій: " + error.message;
             }
         }
 
         async function sendCommand() {
-            if (!characteristic) return alert("Немає зв'язку!");
+            if (!characteristic) return alert("Спочатку підключись!");
             let speed = parseInt(document.getElementById('speedRange').value);
-            // Наша команда: 11, 8, Швидкість
-            let data = new Uint8Array([0x0B, 0x08, speed]);
-            await characteristic.writeValue(data);
+            // 0B (заголовок), 08 (толкачка), швидкість
+            await characteristic.writeValue(new Uint8Array([0x0B, 0x08, speed]));
         }
 
         async function stopDevice() {
-            if (characteristic) {
-                await characteristic.writeValue(new Uint8Array([0x0B, 0x08, 0x00]));
-            }
+            if (characteristic) await characteristic.writeValue(new Uint8Array([0x0B, 0x08, 0x00]));
         }
     </script>
 </body>

@@ -2,44 +2,47 @@
 <html>
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        body { background: #000; color: #0f0; font-family: monospace; text-align: center; padding: 20px; }
-        button { padding: 15px; width: 90%; margin: 10px 0; border-radius: 10px; border: 2px solid #0f0; background: #000; color: #0f0; font-weight: bold; font-size: 18px; }
-        button:active { background: #0f0; color: #000; }
-        input[type=range] { width: 90%; height: 30px; }
-        .box { border: 1px solid #333; padding: 15px; border-radius: 15px; margin-bottom: 10px; }
+        body { background: #111; color: #0f0; font-family: 'Courier New', monospace; text-align: center; padding: 20px; }
+        .card { border: 2px solid #0f0; padding: 20px; border-radius: 15px; display: inline-block; background: #000; box-shadow: 0 0 15px #0f0; }
+        button { background: #000; color: #0f0; border: 2px solid #0f0; padding: 10px 20px; margin: 5px; cursor: pointer; font-weight: bold; border-radius: 5px; }
+        button:hover { background: #0f0; color: #000; }
+        .slider { width: 100%; margin: 20px 0; accent-color: #0f0; }
+        #st { color: #ff0; margin-bottom: 10px; }
     </style>
 </head>
 <body>
-    <h2>JIVE FIX 8T</h2>
-    <div id="st">СТАТУС: OFF</div>
-    
-    <button onclick="connectBT()">🔌 ПІДКЛЮЧИТИ BT</button>
+    <div class="card">
+        <h3>JIVE PC CONTROL</h3>
+        <div id="st">СТАТУС: ТРЕБА ПІДКЛЮЧИТИСЬ</div>
+        
+        <button onclick="connect()">🔌 ПІДКЛЮЧИТИ JIVE</button>
+        
+        <div style="margin: 20px 0; border-top: 1px solid #333; padding-top: 10px;">
+            <p>ВІБРАЦІЯ: <span id="vNum">0</span></p>
+            <input type="range" min="0" max="255" value="0" class="slider" id="vS" oninput="send()">
+        </div>
 
-    <div class="box">
-        <p>ВІБРО: <span id="vNum">0</span></p>
-        <input type="range" min="0" max="255" value="0" id="vS" oninput="run()">
-    </div>
-
-    <div class="box">
         <p>ТОЛКАЧКИ (РЕЖИМИ):</p>
-        <button onclick="setM(1)">MODE 1</button>
-        <button onclick="setM(2)">MODE 2</button>
-        <button onclick="setM(3)">MODE 3</button>
-        <button onclick="setM(5)">MODE 5</button>
-        <button onclick="setM(11)">MODE 11</button>
-    </div>
+        <div id="modes">
+            <button onclick="setM(0)">OFF</button>
+            <button onclick="setM(1)">Mode 1</button>
+            <button onclick="setM(2)">Mode 2</button>
+            <button onclick="setM(3)">Mode 3</button>
+            <button onclick="setM(5)">Mode 5</button>
+            <button onclick="setM(11)">Mode 11</button>
+        </div>
 
-    <button style="border-color: red; color: red;" onclick="stop()">🛑 СТОП</button>
+        <br>
+        <button style="border-color: red; color: red;" onclick="stopAll()">🛑 ТОРМОЗ</button>
+    </div>
 
     <script>
         let ch;
-        let mode = 0;
+        let curM = 0;
 
-        async function connectBT() {
+        async function connect() {
             try {
-                // Прямий запит без лишніх перевірок
                 const device = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
                     optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
@@ -48,37 +51,36 @@
                 const service = await server.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
                 ch = await service.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
                 
-                document.getElementById('st').innerText = "🟢 CONNECTED";
-                // Сигнал пробудження
-                await ch.writeValueWithoutResponse(new Uint8Array([0xff, 0xff, 0xff]));
+                document.getElementById('st').innerText = "🟢 ПІДКЛЮЧЕНО: " + device.name;
+                // Примусовий стоп при підключенні, щоб не толкав одразу
+                await ch.writeValueWithoutResponse(new Uint8Array([1, 0, 0]));
             } catch (e) {
-                alert("Трабла: " + e.message);
+                alert("Помилка: " + e.message);
             }
         }
 
         async function setM(m) {
-            mode = m;
-            await run();
+            curM = m;
+            await send();
         }
 
-        async function run() {
+        async function send() {
             if (!ch) return;
             let v = parseInt(document.getElementById('vS').value);
             document.getElementById('vNum').innerText = v;
             
-            // На основі твого лога: Байт 1=1, Байт 2=Режим, Байт 3=Швидкість
+            // Байт 2 - толкачки (твої графіки), Байт 3 - вібро (плавно)
             try {
-                await ch.writeValueWithoutResponse(new Uint8Array([1, mode, v]));
+                await ch.writeValueWithoutResponse(new Uint8Array([1, curM, v]));
             } catch (e) {}
         }
 
-        async function stop() {
-            if (ch) {
-                document.getElementById('vS').value = 0;
-                document.getElementById('vNum').innerText = 0;
-                mode = 0;
-                await ch.writeValueWithoutResponse(new Uint8Array([1, 0, 0]));
-            }
+        async function stopAll() {
+            if (!ch) return;
+            curM = 0;
+            document.getElementById('vS').value = 0;
+            document.getElementById('vNum').innerText = 0;
+            await ch.writeValueWithoutResponse(new Uint8Array([1, 0, 0]));
         }
     </script>
 </body>

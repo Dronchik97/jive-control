@@ -7,83 +7,97 @@
         button { background: #111; color: #0f0; border: 1px solid #0f0; padding: 15px; margin: 5px; width: 140px; cursor: pointer; font-size: 12px; border-radius: 5px; }
         button:active { background: #0f0; color: #000; }
         .group { border: 1px solid #333; margin: 15px 0; padding: 15px; border-radius: 10px; }
-        input[type=range] { width: 90%; height: 40px; margin: 20px 0; cursor: pointer; accent-color: #0f0; }
-        .status-box { font-size: 12px; color: #666; margin: 10px; padding: 5px; border: 1px solid #222; }
-        h2 { color: #0f0; text-shadow: 0 0 5px #0f0; }
+        input[type=range] { width: 90%; height: 60px; margin: 20px 0; cursor: pointer; accent-color: #0f0; }
+        .status-box { font-size: 12px; color: #666; margin: 10px; padding: 5px; border: 1px solid #222; min-height: 20px; }
+        h2 { color: #0f0; text-shadow: 0 0 5px #0f0; margin-bottom: 5px; }
     </style>
 </head>
 <body>
-    <h2>ANDRII PUSHER PRO 2.0</h2>
+    <h2>ANDRII PUSHER CONTROL v5.0</h2>
     
-    <button onclick="conn()" style="width: 100%; max-width: 310px; border-width: 3px; font-weight: bold;">🔌 1. CONNECT DEVICE</button>
+    <button onclick="conn()" style="width: 100%; max-width: 310px; border-width: 3px;">🔌 CONNECT</button>
+    <button onclick="disconnectDevice()" style="width: 100%; max-width: 310px; border-color: #f0f; color: #f0f;">🚫 DISCONNECT</button>
     
-    <div id="out" class="status-box">Status: Disconnected</div>
+    <div id="out" class="status-box">Disconnected</div>
 
     <div class="group" style="border-color: #0f0;">
-        <p style="font-weight: bold; margin-bottom: 5px;">🎮 УПРАВЛІННЯ ТОЛКАЧКОЮ (11, 8, V)</p>
+        <p style="font-weight: bold;">🎮 LIVE CONTROL (11, 8, V)</p>
+        
+        <button onclick="test([11, 8, 32])" style="width: 100%; max-width: 280px; background: #050;">▶️ ПУСК (0x20)</button>
+        
         <input type="range" id="pusherSlider" min="32" max="100" value="64">
-        <div style="font-size: 20px; margin-bottom: 15px;">Power: <span id="pVal">100</span> (Hex: <span id="hVal">0x64</span>)</div>
-        <button onclick="sendPusher()" style="width: 100%; max-width: 280px; background: #050;">🚀 ЗАПУСТИТИ ТОЛКАЧКУ</button>
+        
+        <div style="font-size: 20px; margin-top: 10px;">
+            Power: <span id="pVal">64</span> (Hex: <span id="hVal">0x40</span>)
+        </div>
     </div>
 
-    <div class="group">
-        <p>КАНАЛИ СКАНЕРА</p>
-        <button onclick="test([1, 1, 150])">[1, 1, 150]</button>
-        <button onclick="test([11, 1, 150])">[11, 1, 150]</button>
-        <button onclick="test([16, 1, 150])">[16, 1, 150]</button>
-    </div>
-
-    <button onclick="stop()" style="color:red; border-color:red; width: 100%; max-width: 310px; font-weight: bold;">🛑 СТОП ВСЕ</button>
+    <button onclick="stop()" style="color:red; border-color:red; width: 100%; max-width: 310px; font-weight: bold; font-size: 20px;">🛑 STOP</button>
 
     <script>
-        let ch;
+        let device, ch;
         const slider = document.getElementById('pusherSlider');
         const pVal = document.getElementById('pVal');
         const hVal = document.getElementById('hVal');
+        const out = document.getElementById('out');
 
-        // Оновлення тексту при русі повзунка
-        slider.oninput = function() {
-            pVal.innerText = this.value;
-            hVal.innerText = "0x" + parseInt(this.value).toString(16).toUpperCase();
+        // ЖИВА РЕАКЦІЯ ПОВЗУНКА
+        slider.oninput = async function() {
+            let speed = parseInt(this.value);
+            pVal.innerText = speed;
+            hVal.innerText = "0x" + speed.toString(16).toUpperCase();
+            
+            // Відправляємо команду відразу при русі
+            if (ch) {
+                try {
+                    const data = new Uint8Array([11, 8, speed]);
+                    await ch.writeValueWithoutResponse(data);
+                } catch (e) {
+                    console.log("Швидка передача..."); 
+                }
+            }
         };
 
         async function conn() {
             try {
-                const d = await navigator.bluetooth.requestDevice({
+                device = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
                     optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
                 });
-                const s = await d.gatt.connect();
+                out.innerText = "Connecting to " + device.name + "...";
+                
+                const s = await device.gatt.connect();
                 const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
                 ch = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-                document.getElementById('out').innerText = "✅ Connected to: " + d.name;
+                
+                out.innerText = "✅ Connected!";
             } catch (e) {
-                document.getElementById('out').innerText = "❌ Error: " + e.message;
+                out.innerText = "❌ Error: " + e.message;
             }
         }
 
-        // Функція суто для толкачки (11, 8, V)
-        async function sendPusher() {
-            if (!ch) return alert("Тисни Connect!");
-            let speed = parseInt(slider.value);
-            const data = new Uint8Array([11, 8, speed]);
-            await ch.writeValueWithoutResponse(data);
-            document.getElementById('out').innerText = "Sent Pusher: " + [11, 8, speed];
+        async function disconnectDevice() {
+            if (device && device.gatt.connected) {
+                await device.gatt.disconnect();
+                ch = null;
+                out.innerText = "🔌 Disconnected manually";
+            } else {
+                out.innerText = "Not connected";
+            }
         }
 
         async function test(arr) {
-            if (!ch) return;
+            if (!ch) return alert("Спочатку підключись!");
             const data = new Uint8Array(arr);
-            document.getElementById('out').innerText = "Sent Manual: " + arr;
             await ch.writeValueWithoutResponse(data);
+            out.innerText = "Sent: " + arr;
         }
 
         async function stop() {
             if (!ch) return;
-            // Стопаємо і толкачку (11, 8, 0), і вібро (1, 0, 0) для вірності
+            // Зупиняємо толкачку
             await ch.writeValueWithoutResponse(new Uint8Array([11, 8, 0]));
-            await ch.writeValueWithoutResponse(new Uint8Array([1, 0, 0]));
-            document.getElementById('out').innerText = "🛑 All Stopped";
+            out.innerText = "🛑 All Stopped";
         }
     </script>
 </body>

@@ -1,79 +1,67 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Pusher Control OK</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { font-family: sans-serif; text-align: center; padding: 20px; background: #121212; color: white; }
-        button { padding: 20px; font-size: 18px; cursor: pointer; border-radius: 10px; border: none; background: #27ae60; color: white; margin: 10px; width: 90%; }
-        .stop { background: #c0392b !important; }
-        input[type=range] { width: 85%; height: 50px; margin: 20px 0; }
-        #status { color: #f1c40f; margin: 15px; border: 1px solid #333; padding: 10px; font-family: monospace; }
+        body { background: #000; color: #0f0; font-family: monospace; text-align: center; }
+        button { background: #111; color: #0f0; border: 1px solid #0f0; padding: 15px; margin: 5px; width: 140px; cursor: pointer; font-size: 12px; }
+        button:active { background: #0f0; color: #000; }
+        .group { border: 1px solid #333; margin: 10px; padding: 10px; border-radius: 10px; }
     </style>
 </head>
 <body>
-    <h2>Толкачка для Андрія 🚀</h2>
-    <div id="status">Статус: Треба натиснути ПІДКЛЮЧИТИСЬ</div>
-    
-    <button onclick="connect()">1. ПІДКЛЮЧИТИСЬ</button>
-    
-    <hr style="border: 0.5px solid #333; margin: 20px;">
-    
-    <p>Швидкість (Hex: <span id="hexVal">0x64</span>):</p>
-    <input type="range" id="speedSlider" min="32" max="100" value="100">
-    <div id="speedVal" style="font-size: 28px; font-weight: bold;">100</div>
-    
-    <button onclick="sendPush()">2. ЗАПУСТИТИ</button>
-    <button class="stop" onclick="stopPush()">3. СТОП</button>
+    <h3>JIVE VIBE SCANNER</h3>
+    <button onclick="conn()" style="width: 300px; border-width: 3px;">🔌 1. CONNECT</button>
+
+    <div class="group">
+        <p>КАНАЛ 1 (Класика MM)</p>
+        <button onclick="test([1, 1, 150])">[1, 1, V]</button>
+        <button onclick="test([1, 2, 150])">[1, 2, V]</button>
+        <button onclick="test([1, 0, 150])">[1, 0, V]</button>
+    </div>
+
+    <div class="group">
+        <p>КАНАЛ 11 (Часто у Jive)</p>
+        <button onclick="test([11, 1, 150])">[11, 1, V]</button>
+        <button onclick="test([11, 0, 150])">[11, 0, V]</button>
+        <button onclick="test([11, 8, 150])">[11, 8, V]</button>
+    </div>
+
+    <div class="group">
+        <p>КАНАЛ 16 (Спецрежими)</p>
+        <button onclick="test([16, 1, 150])">[16, 1, V]</button>
+        <button onclick="test([16, 0, 150])">[16, 0, V]</button>
+    </div>
+
+    <div class="group">
+        <p>КАНАЛ 4 (Старі моделі)</p>
+        <button onclick="test([4, 1, 150])">[4, 1, V]</button>
+        <button onclick="test([4, 150])">[4, V] (2 байта)</button>
+    </div>
+
+    <button onclick="stop()" style="color:red; border-color:red; width: 300px;">🛑 СТОП</button>
+    <div id="out" style="font-size: 10px; color: #666; margin-top: 10px;"></div>
 
     <script>
-        let characteristic;
-        // Використовуємо сервіс, який ми бачили у nRF
-        const SERVICE_UUID = "3d3cbc0e-f76b-11e3-8fcd-b2227cce2b54";
-        const CHAR_UUID = "78667579-7b48-43db-b8c5-7928a6b0a335";
-
-        const slider = document.getElementById('speedSlider');
-        const speedDisplay = document.getElementById('speedVal');
-        const hexDisplay = document.getElementById('hexVal');
-
-        slider.oninput = function() {
-            speedDisplay.innerText = this.value;
-            hexDisplay.innerText = "0x" + parseInt(this.value).toString(16).toUpperCase();
-        };
-
-        async function connect() {
-            try {
-                const device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: [SERVICE_UUID]
-                });
-
-                const server = await device.gatt.connect();
-                const service = await server.getPrimaryService(SERVICE_UUID);
-                characteristic = await service.getCharacteristic(CHAR_UUID);
-
-                document.getElementById('status').innerText = "✅ ПІДКЛЮЧЕНО: " + device.name;
-            } catch (e) {
-                document.getElementById('status').innerText = "❌ Помилка: " + e.message;
-            }
+        let ch;
+        async function conn() {
+            const d = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true, optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
+            });
+            const s = await d.gatt.connect();
+            const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
+            ch = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
+            document.getElementById('out').innerText = "Connected!";
         }
 
-        async function sendPush() {
-            if (!characteristic) return alert("Спочатку підключись!");
-            try {
-                let val = parseInt(slider.value);
-                // Команда: 0B (11), 08 (канал), швидкість
-                let data = new Uint8Array([0x0B, 0x08, val]);
-                await characteristic.writeValue(data);
-            } catch (e) {
-                alert("Збій: " + e.message);
-            }
+        async function test(arr) {
+            if (!ch) return;
+            const data = new Uint8Array(arr);
+            document.getElementById('out').innerText = "Sent: " + arr;
+            await ch.writeValueWithoutResponse(data);
         }
 
-        async function stopPush() {
-            if (characteristic) {
-                await characteristic.writeValue(new Uint8Array([0x0B, 0x08, 0x00]));
-            }
+        async function stop() {
+            if (ch) await ch.writeValueWithoutResponse(new Uint8Array([1, 0, 0]));
         }
     </script>
 </body>

@@ -8,75 +8,87 @@
         button { 
             padding: 20px 40px; font-size: 20px; cursor: pointer; 
             border-radius: 10px; border: none; background: #27ae60; color: white;
-            margin: 10px; transition: 0.3s;
+            margin: 10px; transition: 0.3s; width: 80%;
         }
         button:active { background: #2ecc71; transform: scale(0.95); }
         .stop { background: #c0392b !important; }
         input[type=range] { width: 80%; margin: 20px 0; }
-        #status { color: #f1c40f; margin: 15px; }
+        #status { color: #f1c40f; margin: 15px; font-weight: bold; }
     </style>
 </head>
 <body>
     <h2>Пульт для Андрія 🚀</h2>
-    <div id="status">Статус: Відключено</div>
+    <div id="status">Статус: Треба натиснути "Підключитись"</div>
     
-    <button onclick="connect()">Підключитись</button>
+    <button onclick="connect()">1. ПІДКЛЮЧИТИСЬ</button>
     
     <hr style="border: 0.5px solid #333; margin: 20px;">
     
-    <p>Потужність толкачки:</p>
+    <p>Потужність (0-255):</p>
     <input type="range" id="speedRange" min="0" max="255" value="100">
-    <span id="speedVal">100</span>
+    <span id="speedVal" style="font-size: 24px;">100</span>
     
     <br>
-    <button onclick="sendCommand()">ЗАПУСТИТИ</button>
-    <button class="stop" onclick="stopDevice()">СТОП</button>
+    <button onclick="sendCommand()">2. ЗАПУСТИТИ ТОЛКАЧКУ</button>
+    <button class="stop" onclick="stopDevice()">3. СТОП</button>
 
     <script>
         let device, characteristic;
-        // Твій магічний UUID
-        const SERVICE_UUID = "0000ae00-0000-1000-8000-00805f9b34fb"; // Зазвичай батьківський сервіс
+        // Основні UUID
+        const SERVICE_UUID = "0000ae00-0000-1000-8000-00805f9b34fb"; 
         const CHAR_UUID = "78667579-7b48-43db-b8c5-7928a6b0a335";
 
         const speedRange = document.getElementById('speedRange');
         const speedVal = document.getElementById('speedVal');
-        
         speedRange.oninput = () => speedVal.innerText = speedRange.value;
 
         async function connect() {
             try {
-                document.getElementById('status').innerText = "Шукаю пристрій...";
+                console.log("Запит пристрою...");
+                // ТУТ ЗМІНА: acceptAllDevices дозволяє бачити все
                 device = await navigator.bluetooth.requestDevice({
-                    filters: [{ namePrefix: 'Magic' }, { namePrefix: 'Magic Motion' }],
-                    optionalServices: [SERVICE_UUID, '0000180a', '3d3cbc0e-f76b-11e3-8fcd-b2227cce2b54']
+                    acceptAllDevices: true,
+                    optionalServices: [SERVICE_UUID]
                 });
 
                 const server = await device.gatt.connect();
-                // Пробуємо підключитись до сервісу. Якщо не знаєш точний сервіс, 
-                // іноді треба перебирати, але зазвичай це 0000ae00
+                document.getElementById('status').innerText = "З'єднуюсь з сервісом...";
+                
                 const service = await server.getPrimaryService(SERVICE_UUID);
                 characteristic = await service.getCharacteristic(CHAR_UUID);
 
-                document.getElementById('status').innerText = "Статус: ПІДКЛЮЧЕНО ✅";
+                document.getElementById('status').innerText = "Статус: ГОТОВО ✅ (" + device.name + ")";
+                alert("Підключено до " + device.name);
             } catch (error) {
-                console.log(error);
-                document.getElementById('status').innerText = "Помилка: " + error;
+                console.error(error);
+                alert("Помилка БТ: " + error.message);
+                document.getElementById('status').innerText = "Помилка: " + error.message;
             }
         }
 
         async function sendCommand() {
-            if (!characteristic) return alert("Спочатку підключись!");
-            let speed = parseInt(speedRange.value);
-            
-            // Наша розгадана команда: 0B (11), 08 (канал), speed
-            let data = new Uint8Array([0x0B, 0x08, speed]);
-            await characteristic.writeValue(data);
+            if (!characteristic) {
+                alert("Спочатку тисни кнопку підключення!");
+                return;
+            }
+            try {
+                let speed = parseInt(speedRange.value);
+                // Команда для толкачки (0B 08 Speed)
+                let data = new Uint8Array([0x0B, 0x08, speed]);
+                await characteristic.writeValue(data);
+            } catch (error) {
+                alert("Не вдалося відправити: " + error.message);
+            }
         }
 
         async function stopDevice() {
             if (!characteristic) return;
-            let data = new Uint8Array([0x0B, 0x08, 0x00]);
-            await characteristic.writeValue(data);
+            try {
+                let data = new Uint8Array([0x0B, 0x08, 0x00]);
+                await characteristic.writeValue(data);
+            } catch (error) {
+                console.log(error);
+            }
         }
     </script>
 </body>

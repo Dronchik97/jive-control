@@ -1,67 +1,89 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { background: #000; color: #0f0; font-family: monospace; text-align: center; }
-        button { background: #111; color: #0f0; border: 1px solid #0f0; padding: 15px; margin: 5px; width: 140px; cursor: pointer; font-size: 12px; }
+        body { background: #000; color: #0f0; font-family: monospace; text-align: center; padding: 10px; }
+        button { background: #111; color: #0f0; border: 1px solid #0f0; padding: 15px; margin: 5px; width: 140px; cursor: pointer; font-size: 12px; border-radius: 5px; }
         button:active { background: #0f0; color: #000; }
-        .group { border: 1px solid #333; margin: 10px; padding: 10px; border-radius: 10px; }
+        .group { border: 1px solid #333; margin: 15px 0; padding: 15px; border-radius: 10px; }
+        input[type=range] { width: 90%; height: 40px; margin: 20px 0; cursor: pointer; accent-color: #0f0; }
+        .status-box { font-size: 12px; color: #666; margin: 10px; padding: 5px; border: 1px solid #222; }
+        h2 { color: #0f0; text-shadow: 0 0 5px #0f0; }
     </style>
 </head>
 <body>
-    <h3>JIVE VIBE SCANNER</h3>
-    <button onclick="conn()" style="width: 300px; border-width: 3px;">🔌 1. CONNECT</button>
+    <h2>ANDRII PUSHER PRO 2.0</h2>
+    
+    <button onclick="conn()" style="width: 100%; max-width: 310px; border-width: 3px; font-weight: bold;">🔌 1. CONNECT DEVICE</button>
+    
+    <div id="out" class="status-box">Status: Disconnected</div>
 
-    <div class="group">
-        <p>КАНАЛ 1 (Класика MM)</p>
-        <button onclick="test([1, 1, 150])">[1, 1, V]</button>
-        <button onclick="test([1, 2, 150])">[1, 2, V]</button>
-        <button onclick="test([1, 0, 150])">[1, 0, V]</button>
+    <div class="group" style="border-color: #0f0;">
+        <p style="font-weight: bold; margin-bottom: 5px;">🎮 УПРАВЛІННЯ ТОЛКАЧКОЮ (11, 8, V)</p>
+        <input type="range" id="pusherSlider" min="32" max="100" value="64">
+        <div style="font-size: 20px; margin-bottom: 15px;">Power: <span id="pVal">100</span> (Hex: <span id="hVal">0x64</span>)</div>
+        <button onclick="sendPusher()" style="width: 100%; max-width: 280px; background: #050;">🚀 ЗАПУСТИТИ ТОЛКАЧКУ</button>
     </div>
 
     <div class="group">
-        <p>КАНАЛ 11 (Часто у Jive)</p>
-        <button onclick="test([11, 1, 150])">[11, 1, V]</button>
-        <button onclick="test([11, 0, 150])">[11, 0, V]</button>
-        <button onclick="test([11, 8, 150])">[11, 8, V]</button>
+        <p>КАНАЛИ СКАНЕРА</p>
+        <button onclick="test([1, 1, 150])">[1, 1, 150]</button>
+        <button onclick="test([11, 1, 150])">[11, 1, 150]</button>
+        <button onclick="test([16, 1, 150])">[16, 1, 150]</button>
     </div>
 
-    <div class="group">
-        <p>КАНАЛ 16 (Спецрежими)</p>
-        <button onclick="test([16, 1, 150])">[16, 1, V]</button>
-        <button onclick="test([16, 0, 150])">[16, 0, V]</button>
-    </div>
-
-    <div class="group">
-        <p>КАНАЛ 4 (Старі моделі)</p>
-        <button onclick="test([4, 1, 150])">[4, 1, V]</button>
-        <button onclick="test([4, 150])">[4, V] (2 байта)</button>
-    </div>
-
-    <button onclick="stop()" style="color:red; border-color:red; width: 300px;">🛑 СТОП</button>
-    <div id="out" style="font-size: 10px; color: #666; margin-top: 10px;"></div>
+    <button onclick="stop()" style="color:red; border-color:red; width: 100%; max-width: 310px; font-weight: bold;">🛑 СТОП ВСЕ</button>
 
     <script>
         let ch;
+        const slider = document.getElementById('pusherSlider');
+        const pVal = document.getElementById('pVal');
+        const hVal = document.getElementById('hVal');
+
+        // Оновлення тексту при русі повзунка
+        slider.oninput = function() {
+            pVal.innerText = this.value;
+            hVal.innerText = "0x" + parseInt(this.value).toString(16).toUpperCase();
+        };
+
         async function conn() {
-            const d = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true, optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
-            });
-            const s = await d.gatt.connect();
-            const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
-            ch = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-            document.getElementById('out').innerText = "Connected!";
+            try {
+                const d = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
+                });
+                const s = await d.gatt.connect();
+                const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
+                ch = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
+                document.getElementById('out').innerText = "✅ Connected to: " + d.name;
+            } catch (e) {
+                document.getElementById('out').innerText = "❌ Error: " + e.message;
+            }
+        }
+
+        // Функція суто для толкачки (11, 8, V)
+        async function sendPusher() {
+            if (!ch) return alert("Тисни Connect!");
+            let speed = parseInt(slider.value);
+            const data = new Uint8Array([11, 8, speed]);
+            await ch.writeValueWithoutResponse(data);
+            document.getElementById('out').innerText = "Sent Pusher: " + [11, 8, speed];
         }
 
         async function test(arr) {
             if (!ch) return;
             const data = new Uint8Array(arr);
-            document.getElementById('out').innerText = "Sent: " + arr;
+            document.getElementById('out').innerText = "Sent Manual: " + arr;
             await ch.writeValueWithoutResponse(data);
         }
 
         async function stop() {
-            if (ch) await ch.writeValueWithoutResponse(new Uint8Array([1, 0, 0]));
+            if (!ch) return;
+            // Стопаємо і толкачку (11, 8, 0), і вібро (1, 0, 0) для вірності
+            await ch.writeValueWithoutResponse(new Uint8Array([11, 8, 0]));
+            await ch.writeValueWithoutResponse(new Uint8Array([1, 0, 0]));
+            document.getElementById('out').innerText = "🛑 All Stopped";
         }
     </script>
 </body>

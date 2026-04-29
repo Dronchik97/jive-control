@@ -2,80 +2,62 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Jive Server | Admin</title>
+    <title>Jive Server | Global</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
-        body { background: #050505; color: #00ff41; font-family: monospace; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .server-box { border: 2px solid #00ff41; padding: 30px; border-radius: 20px; background: #111; width: 350px; text-align: center; box-shadow: 0 0 20px rgba(0,255,65,0.2); }
-        button { background: #00ff41; color: #000; border: none; padding: 15px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; margin-top: 10px; text-transform: uppercase; }
-        #log { font-size: 10px; color: #666; margin-top: 20px; height: 100px; overflow-y: auto; text-align: left; border-top: 1px solid #222; padding-top: 10px; }
-        .status { margin-bottom: 20px; font-size: 18px; font-bold: true; }
+        body { background: #050505; color: #00ff41; font-family: monospace; text-align: center; padding: 20px; }
+        .box { border: 2px solid #00ff41; padding: 20px; border-radius: 15px; background: #111; display: inline-block; width: 300px; }
+        button { background: #00ff41; color: #000; border: none; padding: 15px; width: 100%; cursor: pointer; font-weight: bold; margin-top: 10px; }
+        #log { font-size: 10px; color: #555; text-align: left; margin-top: 20px; height: 100px; overflow-y: auto; }
     </style>
 </head>
 <body>
+    <div class="box">
+        <h3>📡 GLOBAL SERVER</h3>
+        <div id="stat">STATUS: READY</div>
+        <button onclick="connectBT()">1. ПІДКЛЮЧИТИ ІГРАШКУ</button>
+        <div id="log"></div>
+    </div>
 
-<div class="server-box">
-    <h2>🛠️ JIVE SERVER</h2>
-    <div class="status" id="btStat">ОЧІКУВАННЯ...</div>
-    
-    <button onclick="connectHardware()">ПІДКЛЮЧИТИ ЗАЛІЗО</button>
-    
-    <div id="log"></div>
-</div>
+    <script>
+        let toyChar;
+        const TOPIC = "andrii_jive_vibe_999"; // Твій унікальний канал в інтернеті
+        const client = mqtt.connect('wss://test.mosquitto.org:8081');
 
-<script>
-    let toyChar;
+        function addLog(m) { document.getElementById('log').innerHTML += `> ${m}<br>`; }
 
-    function addLog(msg) {
-        const log = document.getElementById('log');
-        log.innerHTML += `> ${msg}<br>`;
-        log.scrollTop = log.scrollHeight;
-    }
+        client.on('connect', () => {
+            addLog("Підключено до хмари");
+            client.subscribe(TOPIC);
+        });
 
-    async function connectHardware() {
-        try {
-            document.getElementById('btStat').innerText = "🔍 ШУКАЮ...";
-            const device = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true,
-                optionalServices: ['0000fee9-0000-1000-8000-00805f9b34fb'] 
-            });
-
-            const server = await device.gatt.connect();
-            addLog("З'єднано з: " + device.name);
-
-            // Шукаємо сервіс і характеристику
-            const services = await server.getPrimaryServices();
-            for (let service of services) {
-                const chars = await service.getCharacteristics();
-                toyChar = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
-                if (toyChar) {
-                    addLog("Канал знайдено: " + service.uuid);
-                    break;
-                }
-            }
-
+        client.on('message', (topic, message) => {
+            const speed = parseInt(message.toString());
+            addLog("Отримано з мережі: " + speed);
             if (toyChar) {
-                document.getElementById('btStat').innerText = "✅ ПІДКЛЮЧЕНО";
-                document.getElementById('btStat').style.color = "#00ff41";
-                startListening(); // Починаємо чекати команди з пульта
-            }
-        } catch (e) {
-            addLog("Помилка: " + e.message);
-            document.getElementById('btStat').innerText = "⚠️ ЗБІЙ";
-        }
-    }
-
-    function startListening() {
-        addLog("Сервер активний. Слухаю команди...");
-        window.addEventListener('storage', (event) => {
-            if (event.key === 'vibe_cmd') {
-                const speed = parseInt(event.newValue);
-                if (toyChar) {
-                    toyChar.writeValueWithoutResponse(new Uint8Array([0xFF, speed]));
-                    addLog("Команда: " + speed);
-                }
+                toyChar.writeValueWithoutResponse(new Uint8Array([0xFF, speed]));
             }
         });
-    }
-</script>
+
+        async function connectBT() {
+            try {
+                const device = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: ['0000fee9-0000-1000-8000-00805f9b34fb']
+                });
+                const server = await device.gatt.connect();
+                const services = await server.getPrimaryServices();
+                for (let s of services) {
+                    const chars = await s.getCharacteristics();
+                    toyChar = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
+                    if (toyChar) break;
+                }
+                if (toyChar) {
+                    document.getElementById('stat').innerText = "✅ ONLINE";
+                    addLog("Іграшка готова до команд!");
+                }
+            } catch (e) { addLog("Error: " + e); }
+        }
+    </script>
 </body>
 </html>

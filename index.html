@@ -1,66 +1,71 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Jive Control - Lovense Analog</title>
+    <title>Jive Control - Audio Sensor</title>
     <style>
-        body { background: #000; color: #0f0; font-family: 'Courier New', monospace; text-align: center; padding: 20px; }
-        .panel { border: 2px solid #0f0; padding: 20px; border-radius: 15px; display: inline-block; }
-        .status { margin: 10px; padding: 10px; border-radius: 5px; font-weight: bold; }
-        .active { background: #004400; border: 1px solid #0f0; }
-        .inactive { background: #440000; border: 1px solid #f00; color: #f00; }
-        button { background: #0f0; color: #000; border: none; padding: 15px 30px; font-weight: bold; cursor: pointer; border-radius: 5px; }
+        body { background: #000; color: #0f0; font-family: sans-serif; text-align: center; padding: 20px; }
+        .box { border: 2px solid #0f0; padding: 20px; border-radius: 15px; background: #111; }
+        #meter { width: 100%; height: 20px; background: #222; margin: 15px 0; border: 1px solid #0f0; }
+        #fill { width: 0%; height: 100%; background: #0f0; transition: width 0.1s; }
+        button { background: #0f0; color: #000; border: none; padding: 15px 20px; border-radius: 10px; font-weight: bold; cursor: pointer; margin: 5px; width: 80%; }
+        .status { font-size: 12px; margin: 10px; color: #888; }
     </style>
 </head>
 <body>
-    <div class="panel">
-        <h1>🦾 JIVE-CONTROL V1.0</h1>
-        <p>Аналог Lovense для Андрія</p>
+    <div class="box">
+        <h2>🦾 JIVE-CONTROL: AUDIO</h2>
+        <div id="btStat" class="status">Bluetooth: Не підключено</div>
+        <button onclick="connectBT()">🔌 1. ПІДКЛЮЧИТИ ІГРАШКУ</button>
+        <button onclick="startAudio()">🎤 2. СЛУХАТИ ДОНАТИ</button>
         
-        <div id="btStatus" class="status inactive">БЛЮТУЗ: НЕМА КОНТАКТУ</div>
-        <button onclick="connectBT()">🔌 ПІДКЛЮЧИТИ ІГРАШКУ</button>
-        
-        <div id="siteStatus" class="status inactive">САЙТ: ЧЕКАЮ СИГНАЛУ</div>
+        <div id="meter"><div id="fill"></div></div>
+        <p id="info">Рівень звуку: 0%</p>
     </div>
 
     <script>
-        let toyChar;
+        let ch;
+        let audioContext, analyser, dataArray;
 
         async function connectBT() {
-            try {
-                const device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
-                });
-                const server = await device.gatt.connect();
-                const service = await server.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
-                toyChar = await service.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-                
-                document.getElementById('btStatus').innerText = "БЛЮТУЗ: КОНТАКТ Є!";
-                document.getElementById('btStatus').className = "status active";
-                startListening();
-            } catch(e) {
-                alert("Помилка: " + e);
-            }
-        }
-
-        function startListening() {
-            document.getElementById('siteStatus').innerText = "САЙТ: СЛУХАЮ ТОКЕНИ...";
-            document.getElementById('siteStatus').className = "status active";
-
-            // Слухаємо команди від Lovense Extension або сайту
-            window.addEventListener('message', function(event) {
-                if (event.data && event.data.action === 'vibrate') {
-                    let intensity = event.data.value; // зазвичай 0-20
-                    sendToToy(intensity);
-                }
+            const device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
             });
+            const server = await device.gatt.connect();
+            const service = await server.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
+            ch = await service.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
+            document.getElementById('btStat').innerText = "✅ Bluetooth: ПІДКЛЮЧЕНО";
+            document.getElementById('btStat').style.color = "#0f0";
         }
 
-        async function sendToToy(speed) {
-            if (!toyChar) return;
-            // Твоя команда: 0x00 (хедер), 0x08 (мотор), speed (0-20)
-            let val = Math.min(Math.max(parseInt(speed), 0), 20); 
-            await toyChar.writeValueWithoutResponse(new Uint8Array([0x00, 0x08, val]));
+        async function startAudio() {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            audioContext = new AudioContext();
+            const source = audioContext.createMediaStreamSource(stream);
+            analyser = audioContext.createAnalyser();
+            source.connect(analyser);
+            analyser.fftSize = 256;
+            dataArray = new Uint8Array(analyser.frequencyBinCount);
+            detect();
+        }
+
+        function detect() {
+            analyser.getByteFrequencyData(dataArray);
+            let sum = 0;
+            for(let i=0; i<dataArray.length; i++) sum += dataArray[i];
+            let vol = Math.round(sum / dataArray.length);
+            
+            document.getElementById('fill').style.width = vol + "%";
+            document.getElementById('info').innerText = "Рівень звуку: " + vol + "%";
+
+            // Якщо звук гучний (наприклад більше 30) - шлемо вібрацію
+            if (vol > 30 && ch) {
+                let speed = Math.min(Math.round(vol / 4), 20); // Масштабуємо під твої 0-20
+                ch.writeValueWithoutResponse(new Uint8Array([0x00, 0x08, speed]));
+            } else if (ch) {
+                ch.writeValueWithoutResponse(new Uint8Array([0x00, 0x08, 0])); // Стоп, якщо тихо
+            }
+            requestAnimationFrame(detect);
         }
     </script>
 </body>

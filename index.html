@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Jive Server | Final Byte Fix</title>
+    <title>Jive Server | Poltava Fix</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { background: #050505; color: #00ff41; font-family: monospace; text-align: center; padding: 20px; }
@@ -14,14 +14,12 @@
 </head>
 <body>
     <div class="box">
-        <h3>🛰️ SERVER ADM UNIT (BYTE MODE)</h3>
-        <button onclick="connectBT()">🔗 1. ПІДКЛЮЧИТИ ІГРАШКУ</button>
-        <div id="btStat" style="color:red; font-size:12px; margin-bottom:15px;">Bluetooth: DISCONNECTED</div>
-        
+        <h3>🛰️ SERVER ADM UNIT</h3>
+        <button onclick="connectBT()">🔗 1. ПІДКЛЮЧИТИ CBT001</button>
+        <div id="btStat" style="color:red; font-size:12px; margin-bottom:15px;">BT: OFF</div>
         <hr style="border: 0.5px solid #222;">
         <input type="text" id="customId" placeholder="ВВЕДИ СВІЙ ID">
         <button style="background:#00ff41; color:#000;" onclick="startServer()">🚀 2. ЗАПУСТИТИ МЕРЕЖУ</button>
-        
         <div id="log"></div>
     </div>
 
@@ -47,33 +45,31 @@
                     if (toyChar) break;
                 }
                 if (toyChar) {
-                    document.getElementById('btStat').innerText = "✅ ПІДКЛЮЧЕНО: " + device.name;
+                    document.getElementById('btStat').innerText = "✅ ПІДКЛЮЧЕНО";
                     document.getElementById('btStat').style.color = "#00ff41";
                     addLog("Залізо зачепилося!");
                 }
-            } catch (e) { addLog("Помилка BT: " + e.message); }
+            } catch (e) { addLog("BT Error: " + e.message); }
         }
 
         function startServer() {
             const myId = document.getElementById('customId').value;
             if(!myId) return alert("Впиши ID!");
             peer = new Peer(myId);
-            peer.on('open', (id) => { addLog("СЕРВЕР ОНЛАЙН. ID: " + id); });
+            peer.on('open', (id) => { addLog("ID активний: " + id); });
             peer.on('connection', (conn) => {
-                addLog("Пульт підключився.");
+                addLog("Пульт онлайн.");
                 conn.on('data', (data) => {
                     if (toyChar) {
-                        // ТА САМА ЛОГІКА БАЙТІВ:
+                        // ТОЛКАЧКИ (3 БАЙТИ)
+                        const pushBytes = new Uint8Array([0x00, 0x08, data.m2]);
+                        toyChar.writeValueWithoutResponse(pushBytes);
+
+                        // ВІБРО (7 БАЙТІВ) - Саме той формат, шо робив!
+                        const vibroBytes = new Uint8Array([0x01, 0x01, data.m1, 0x00, 0x00, 0x00, 0x00]);
+                        toyChar.writeValueWithoutResponse(vibroBytes);
                         
-                        // 1. ВІБРО (7 байтів)
-                        const vibroCmd = new Uint8Array([0x01, 0x01, data.m1, 0x01, 0x01, 0x01, 0x01]);
-                        toyChar.writeValueWithoutResponse(vibroCmd);
-                        
-                        // 2. ТОЛКАЧКИ (3 байти) - 0008 + швидкість
-                        const pushCmd = new Uint8Array([0x00, 0x08, data.m2]);
-                        toyChar.writeValueWithoutResponse(pushCmd);
-                        
-                        addLog(`ШЛЮ: Vibro:${data.m1} | Push:${data.m2}`);
+                        addLog(`M1(Vibro):${data.m1} | M2(Push):${data.m2}`);
                     }
                 });
             });

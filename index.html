@@ -2,42 +2,50 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Jive Server | Global</title>
+    <title>Jive Server | Control</title>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
         body { background: #050505; color: #00ff41; font-family: monospace; text-align: center; padding: 20px; }
-        .box { border: 2px solid #00ff41; padding: 20px; border-radius: 15px; background: #111; display: inline-block; width: 300px; }
+        .box { border: 2px solid #00ff41; padding: 20px; border-radius: 15px; background: #111; display: inline-block; width: 320px; }
+        input { background: #000; border: 1px solid #333; color: #00ff41; padding: 10px; width: 80%; margin: 10px 0; text-align: center; }
         button { background: #00ff41; color: #000; border: none; padding: 15px; width: 100%; cursor: pointer; font-weight: bold; margin-top: 10px; }
-        #log { font-size: 10px; color: #555; text-align: left; margin-top: 20px; height: 100px; overflow-y: auto; }
+        #log { font-size: 10px; color: #555; text-align: left; margin-top: 20px; height: 100px; overflow-y: auto; border-top: 1px solid #222; }
     </style>
 </head>
 <body>
     <div class="box">
-        <h3>📡 GLOBAL SERVER</h3>
-        <div id="stat">STATUS: READY</div>
-        <button onclick="connectBT()">1. ПІДКЛЮЧИТИ ІГРАШКУ</button>
+        <h3>🖥️ SERVER ADM</h3>
+        <input type="text" id="roomId" placeholder="ВВЕДИ СВІЙ ID (ПАРОЛЬ)">
+        <button onclick="startServer()">1. ЗАПУСТИТИ СЕРВЕР</button>
+        <button onclick="connectBT()" id="btBtn" style="display:none; background: #0088ff;">2. ПІДКЛЮЧИТИ ІГРАШКУ</button>
         <div id="log"></div>
     </div>
 
     <script>
-        let toyChar;
-        const TOPIC = "andrii_jive_vibe_999"; // Твій унікальний канал в інтернеті
-        const client = mqtt.connect('wss://test.mosquitto.org:8081');
+        let toyChar, mqttClient;
 
         function addLog(m) { document.getElementById('log').innerHTML += `> ${m}<br>`; }
 
-        client.on('connect', () => {
-            addLog("Підключено до хмари");
-            client.subscribe(TOPIC);
-        });
+        function startServer() {
+            const id = document.getElementById('roomId').value;
+            if(!id) return alert("Введи ID!");
+            
+            mqttClient = mqtt.connect('wss://test.mosquitto.org:8081');
+            mqttClient.on('connect', () => {
+                addLog("Сервер онлайн. ID: " + id);
+                mqttClient.subscribe("jive/" + id);
+                document.getElementById('btBtn').style.display = 'block';
+            });
 
-        client.on('message', (topic, message) => {
-            const speed = parseInt(message.toString());
-            addLog("Отримано з мережі: " + speed);
-            if (toyChar) {
-                toyChar.writeValueWithoutResponse(new Uint8Array([0xFF, speed]));
-            }
-        });
+            mqttClient.on('message', (topic, msg) => {
+                const data = JSON.parse(msg.toString());
+                addLog(`Мотор1: ${data.m1}, Мотор2: ${data.m2}`);
+                if (toyChar) {
+                    // Відправляємо байти на обидва мотори (якщо іграшка підтримує)
+                    toyChar.writeValueWithoutResponse(new Uint8Array([0xFF, data.m1, data.m2]));
+                }
+            });
+        }
 
         async function connectBT() {
             try {
@@ -52,11 +60,8 @@
                     toyChar = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
                     if (toyChar) break;
                 }
-                if (toyChar) {
-                    document.getElementById('stat').innerText = "✅ ONLINE";
-                    addLog("Іграшка готова до команд!");
-                }
-            } catch (e) { addLog("Error: " + e); }
+                if (toyChar) addLog("✅ ІГРАШКА ГОТОВА");
+            } catch (e) { addLog("BT Error: " + e); }
         }
     </script>
 </body>

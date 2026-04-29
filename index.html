@@ -2,40 +2,35 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Jive Control - Start Link</title>
+    <title>Jive - Manual Setup</title>
     <style>
-        body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; font-family: sans-serif; }
-        .connect-btn { 
-            background: transparent; color: #00ff41; border: 3px solid #00ff41; 
-            padding: 25px 50px; font-size: 22px; cursor: pointer; border-radius: 60px;
-            text-transform: uppercase; letter-spacing: 3px; font-weight: bold;
-            transition: 0.3s; box-shadow: 0 0 20px rgba(0,255,65,0.2);
-        }
-        .connect-btn:hover { background: #00ff41; color: #000; box-shadow: 0 0 40px #00ff41; }
+        body { background: #000; color: #00ff41; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; font-family: monospace; }
+        .setup-box { border: 2px solid #00ff41; padding: 30px; border-radius: 20px; background: #111; text-align: center; }
+        input { background: #000; border: 1px solid #00ff41; color: #00ff41; padding: 10px; width: 250px; margin: 20px 0; font-family: monospace; font-size: 16px; text-align: center; }
+        .btn { background: #00ff41; color: #000; border: none; padding: 15px 30px; cursor: pointer; font-weight: bold; border-radius: 10px; text-transform: uppercase; }
+        .label { font-size: 12px; letter-spacing: 2px; }
     </style>
 </head>
 <body>
 
-    <button class="connect-btn" onclick="connectAndGo()">Connect Bluetooth</button>
+<div class="setup-box">
+    <div class="label">ВВЕДІТЬ ID ПРИСТРОЮ:</div>
+    <input type="text" id="manualId" placeholder="Наприклад: 12345-abc-678">
+    <br>
+    <button class="btn" onclick="setManualId()">Зберегти та перейти</button>
+</div>
 
-    <script>
-        async function connectAndGo() {
-            try {
-                // Викликаємо вікно вибору пристрою
-                const device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: ['0000fee9-0000-1000-8000-00805f9b34fb']
-                });
-                
-                // Якщо пристрій вибрано, зберігаємо його ID (або просто переходимо)
-                // Оскільки Bluetooth-об'єкт не можна просто передати між сторінками, 
-                // ми переходимо на remote.html, де вже будемо працювати.
-                
-                window.location.href = 'remote.html';
-            } catch (e) {
-                alert("Помилка підключення: " + e);
-            }
+<script>
+    function setManualId() {
+        const myId = document.getElementById('manualId').value;
+        if (myId) {
+            localStorage.setItem('lastDeviceId', myId);
+            window.location.href = 'remote.html';
+        } else {
+            alert("Введи ID, не халяв!");
         }
-    </script>
+    }
+</script>
+
 </body>
 </html>

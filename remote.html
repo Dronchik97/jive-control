@@ -2,64 +2,38 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Jive Remote | Client</title>
+    <title>Jive Remote | Global</title>
+    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
-        :root { --neon: #00ff41; }
-        body { background: #0b0e14; color: #fff; font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .pult { width: 320px; background: #161b22; border-radius: 50px; padding: 40px 20px; border: 2px solid var(--neon); box-shadow: 0 0 40px rgba(0,255,65,0.2); text-align: center; position: relative; }
-        
-        input[type="text"] { background: #000; border: 1px solid #333; color: var(--neon); padding: 15px; border-radius: 15px; width: 80%; text-align: center; font-size: 18px; }
-        
-        .slider { width: 100%; margin: 40px 0; -webkit-appearance: none; background: #000; height: 12px; border-radius: 10px; outline: none; }
-        .slider::-webkit-slider-thumb { -webkit-appearance: none; width: 35px; height: 35px; background: var(--neon); border-radius: 50%; cursor: pointer; box-shadow: 0 0 15px var(--neon); }
-
-        .btn-stop { background: #ff4141; color: #000; border: none; padding: 20px; width: 100%; border-radius: 20px; font-weight: bold; cursor: pointer; text-transform: uppercase; font-size: 16px; box-shadow: 0 5px 15px rgba(255,65,65,0.3); }
-        .btn-login { background: var(--neon); color: #000; border: none; padding: 15px; width: 100%; border-radius: 15px; font-weight: bold; cursor: pointer; margin-top: 20px; }
-        #valDisplay { font-size: 32px; font-weight: bold; color: var(--neon); text-shadow: 0 0 10px var(--neon); }
+        body { background: #0b0e14; color: #fff; font-family: sans-serif; text-align: center; padding: 50px 20px; }
+        .pult { max-width: 400px; margin: auto; background: #161b22; padding: 40px; border-radius: 50px; border: 2px solid #00ff41; }
+        .slider { width: 100%; height: 15px; background: #000; border-radius: 10px; -webkit-appearance: none; margin: 40px 0; }
+        .slider::-webkit-slider-thumb { -webkit-appearance: none; width: 40px; height: 40px; background: #00ff41; border-radius: 50%; cursor: pointer; box-shadow: 0 0 15px #00ff41; }
+        .btn-stop { background: #ff4141; color: #000; border: none; padding: 20px; width: 100%; border-radius: 20px; font-weight: bold; font-size: 18px; cursor: pointer; }
+        #val { font-size: 40px; color: #00ff41; font-weight: bold; }
     </style>
 </head>
 <body>
-
-<div class="pult">
-    <div id="loginSection">
-        <h2 style="letter-spacing: 2px;">ACCESS REQUIRED</h2>
-        <input type="text" id="passInput" placeholder="ВВЕДІТЬ ID">
-        <button class="btn-login" onclick="checkPass()">УВІЙТИ В СИСТЕМУ</button>
+    <div class="pult">
+        <h2>JIVE REMOTE</h2>
+        <div id="val">0%</div>
+        <input type="range" min="0" max="255" value="0" class="slider" oninput="sendSpeed(this.value)">
+        <button class="btn-stop" onclick="sendSpeed(0)">STOP</button>
+        <div id="status" style="margin-top:20px; font-size:10px; color:#444;">CONNECTING TO CLOUD...</div>
     </div>
 
-    <div id="controlSection" style="display:none;">
-        <h2 style="color:var(--neon); letter-spacing: 3px;">REMOTE UNIT</h2>
-        
-        <div id="valDisplay">0%</div>
-        <input type="range" min="0" max="255" value="0" class="slider" id="vibeRange" oninput="sendVibe(this.value)">
+    <script>
+        const TOPIC = "andrii_jive_vibe_999";
+        const client = mqtt.connect('wss://test.mosquitto.org:8081');
 
-        <button class="btn-stop" onclick="stopVibe()">⚠️ EMERGENCY STOP ⚠️</button>
-    </div>
-</div>
+        client.on('connect', () => {
+            document.getElementById('status').innerText = "CONNECTED TO SERVER";
+        });
 
-<script>
-    const REAL_PASS = "1234"; // ТВІЙ ПАРОЛЬ ТУТ
-
-    function checkPass() {
-        if(document.getElementById('passInput').value === REAL_PASS) {
-            document.getElementById('loginSection').style.display = 'none';
-            document.getElementById('controlSection').style.display = 'block';
-        } else {
-            alert("НЕВІРНИЙ ID!");
+        function sendSpeed(val) {
+            document.getElementById('val').innerText = Math.round((val/255)*100) + "%";
+            client.publish(TOPIC, val.toString());
         }
-    }
-
-    function sendVibe(val) {
-        let percent = Math.round((val / 255) * 100);
-        document.getElementById('valDisplay').innerText = percent + "%";
-        // Записуємо команду в локальну пам'ять, яку чує index.html
-        localStorage.setItem('vibe_cmd', val);
-    }
-
-    function stopVibe() {
-        document.getElementById('vibeRange').value = 0;
-        sendVibe(0);
-    }
-</script>
+    </script>
 </body>
 </html>

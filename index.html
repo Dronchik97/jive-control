@@ -2,35 +2,59 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Jive - Manual Setup</title>
+    <title>Jive Server | Admin</title>
     <style>
-        body { background: #000; color: #00ff41; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; font-family: monospace; }
-        .setup-box { border: 2px solid #00ff41; padding: 30px; border-radius: 20px; background: #111; text-align: center; }
-        input { background: #000; border: 1px solid #00ff41; color: #00ff41; padding: 10px; width: 250px; margin: 20px 0; font-family: monospace; font-size: 16px; text-align: center; }
-        .btn { background: #00ff41; color: #000; border: none; padding: 15px 30px; cursor: pointer; font-weight: bold; border-radius: 10px; text-transform: uppercase; }
-        .label { font-size: 12px; letter-spacing: 2px; }
+        body { background: #050505; color: #00ff41; font-family: monospace; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .server-box { border: 2px solid #00ff41; padding: 30px; border-radius: 20px; background: #111; box-shadow: 0 0 20px #00ff41; width: 320px; text-align: center; }
+        input { background: #000; border: 1px solid #333; color: #00ff41; padding: 10px; width: 80%; margin: 15px 0; border-radius: 5px; text-align: center; }
+        button { background: #00ff41; color: #000; border: none; padding: 15px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .status { font-size: 12px; margin-top: 15px; color: #666; }
     </style>
 </head>
 <body>
 
-<div class="setup-box">
-    <div class="label">ВВЕДІТЬ ID ПРИСТРОЮ:</div>
-    <input type="text" id="manualId" placeholder="Наприклад: 12345-abc-678">
-    <br>
-    <button class="btn" onclick="setManualId()">Зберегти та перейти</button>
+<div class="server-box">
+    <h2>🖥️ SERVER NODE</h2>
+    
+    <div class="status" id="btStat">СТАТУС: HARDWARE DISCONNECTED</div>
+    <button onclick="connectHardware()">1. ПІДКЛЮЧИТИ ІГРАШКУ</button>
+
+    <hr style="border: 0.5px solid #222; margin: 20px 0;">
+
+    <div class="label">ЗАДАТИ ID (ПАРОЛЬ) ДЛЯ REMOTE:</div>
+    <input type="text" id="passId" placeholder="Наприклад: boss_777">
+    <button onclick="setPass()">2. ЗБЕРЕГТИ ПАРОЛЬ</button>
+    
+    <div class="status" id="saveStat"></div>
 </div>
 
 <script>
-    function setManualId() {
-        const myId = document.getElementById('manualId').value;
-        if (myId) {
-            localStorage.setItem('lastDeviceId', myId);
-            window.location.href = 'remote.html';
-        } else {
-            alert("Введи ID, не халяв!");
-        }
+    let toyChar;
+
+    async function connectHardware() {
+        try {
+            const device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: ['0000fee9-0000-1000-8000-00805f9b34fb']
+            });
+            const server = await device.gatt.connect();
+            const service = await server.getPrimaryService('0000fee9-0000-1000-8000-00805f9b34fb');
+            const chars = await service.getCharacteristics();
+            toyChar = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
+            
+            if (toyChar) {
+                document.getElementById('btStat').innerText = "✅ ІГРАШКА ПІДКЛЮЧЕНА";
+                document.getElementById('btStat').style.color = "#00ff41";
+                // Зберігаємо об'єкт в пам'ять (хоча для повної роботи треба буде тримати цю вкладку відкритою)
+            }
+        } catch (e) { alert("Помилка BT: " + e); }
+    }
+
+    function setPass() {
+        const pass = document.getElementById('passId').value;
+        localStorage.setItem('remote_pass', pass);
+        document.getElementById('saveStat').innerText = "ПАРОЛЬ ВСТАНОВЛЕНО!";
     }
 </script>
-
 </body>
 </html>

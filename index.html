@@ -2,67 +2,103 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Jive Server | Control</title>
+    <title>Jive Server | Final</title>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
         body { background: #050505; color: #00ff41; font-family: monospace; text-align: center; padding: 20px; }
-        .box { border: 2px solid #00ff41; padding: 20px; border-radius: 15px; background: #111; display: inline-block; width: 320px; }
-        input { background: #000; border: 1px solid #333; color: #00ff41; padding: 10px; width: 80%; margin: 10px 0; text-align: center; }
-        button { background: #00ff41; color: #000; border: none; padding: 15px; width: 100%; cursor: pointer; font-weight: bold; margin-top: 10px; }
-        #log { font-size: 10px; color: #555; text-align: left; margin-top: 20px; height: 100px; overflow-y: auto; border-top: 1px solid #222; }
+        .box { border: 2px solid #00ff41; padding: 30px; border-radius: 20px; background: #111; display: inline-block; width: 340px; box-shadow: 0 0 20px #00ff41; }
+        
+        /* СИНЯ КНОПКА БЛЮТУЗА */
+        .btn-bt { background: #0088ff; color: #fff; border: none; padding: 18px; width: 100%; cursor: pointer; font-weight: bold; border-radius: 12px; margin-bottom: 20px; text-transform: uppercase; font-size: 14px; box-shadow: 0 0 15px rgba(0,136,255,0.4); }
+        .btn-bt:hover { background: #00a2ff; }
+
+        input { background: #000; border: 1px solid #333; color: #00ff41; padding: 12px; width: 85%; margin: 15px 0; text-align: center; border-radius: 5px; font-size: 16px; }
+        .btn-server { background: #00ff41; color: #000; border: none; padding: 15px; width: 100%; cursor: pointer; font-weight: bold; border-radius: 10px; text-transform: uppercase; }
+        
+        #log { font-size: 11px; color: #666; text-align: left; margin-top: 20px; height: 100px; overflow-y: auto; border-top: 1px solid #222; padding-top: 10px; }
+        .status-text { font-size: 12px; margin-bottom: 10px; color: #ff4141; }
     </style>
 </head>
 <body>
-    <div class="box">
-        <h3>🖥️ SERVER ADM</h3>
-        <input type="text" id="roomId" placeholder="ВВЕДИ СВІЙ ID (ПАРОЛЬ)">
-        <button onclick="startServer()">1. ЗАПУСТИТИ СЕРВЕР</button>
-        <button onclick="connectBT()" id="btBtn" style="display:none; background: #0088ff;">2. ПІДКЛЮЧИТИ ІГРАШКУ</button>
-        <div id="log"></div>
-    </div>
 
-    <script>
-        let toyChar, mqttClient;
+<div class="box">
+    <h3>🖥️ SERVER ADM UNIT</h3>
+    
+    <div id="btStat" class="status-text">ІГРАШКА НЕ ПІДКЛЮЧЕНА</div>
+    <button class="btn-bt" onclick="connectBT()">🔗 1. ПІДКЛЮЧИТИ ІГРАШКУ (BT)</button>
 
-        function addLog(m) { document.getElementById('log').innerHTML += `> ${m}<br>`; }
+    <hr style="border: 0.5px solid #222; margin: 20px 0;">
 
-        function startServer() {
-            const id = document.getElementById('roomId').value;
-            if(!id) return alert("Введи ID!");
-            
-            mqttClient = mqtt.connect('wss://test.mosquitto.org:8081');
-            mqttClient.on('connect', () => {
-                addLog("Сервер онлайн. ID: " + id);
-                mqttClient.subscribe("jive/" + id);
-                document.getElementById('btBtn').style.display = 'block';
+    <div>ВВЕДИ ID ПАРОЛЬ:</div>
+    <input type="text" id="roomId" placeholder="Наприклад: 1234">
+    <button class="btn-server" onclick="startGlobalServer()">🛰️ 2. ЗАПУСТИТИ ТРАНСЛЯЦІЮ</button>
+    
+    <div id="log"></div>
+</div>
+
+<script>
+    let toyChar, mqttClient;
+
+    function addLog(m) {
+        const log = document.getElementById('log');
+        log.innerHTML += `> ${m}<br>`;
+        log.scrollTop = log.scrollHeight;
+    }
+
+    // ЛОГІКА ПІДКЛЮЧЕННЯ БЛЮТУЗ
+    async function connectBT() {
+        try {
+            addLog("Шукаю пристрій...");
+            const device = await navigator.bluetooth.requestDevice({
+                acceptAllDevices: true,
+                optionalServices: ['0000fee9-0000-1000-8000-00805f9b34fb']
             });
 
-            mqttClient.on('message', (topic, msg) => {
+            const server = await device.gatt.connect();
+            addLog("З'єднано: " + device.name);
+            
+            const services = await server.getPrimaryServices();
+            for (let s of services) {
+                const chars = await s.getCharacteristics();
+                // Шукаємо характеристику для запису
+                toyChar = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
+                if (toyChar) break;
+            }
+
+            if (toyChar) {
+                document.getElementById('btStat').innerText = "✅ ПІДКЛЮЧЕНО: " + device.name;
+                document.getElementById('btStat').style.color = "#00ff41";
+                addLog("Канал керування знайдено.");
+            }
+        } catch (e) {
+            addLog("Помилка BT: " + e.message);
+        }
+    }
+
+    // ЛОГІКА ТРАНСЛЯЦІЇ ЧЕРЕЗ ІНТЕРНЕТ
+    function startGlobalServer() {
+        const id = document.getElementById('roomId').value;
+        if(!id) return alert("Введи ID!");
+
+        mqttClient = mqtt.connect('wss://test.mosquitto.org:8081');
+        
+        mqttClient.on('connect', () => {
+            addLog("Мережа активна. ID: " + id);
+            mqttClient.subscribe("jive/" + id);
+            document.getElementById('roomId').disabled = true;
+        });
+
+        mqttClient.on('message', (topic, msg) => {
+            try {
                 const data = JSON.parse(msg.toString());
-                addLog(`Мотор1: ${data.m1}, Мотор2: ${data.m2}`);
+                // Шлемо байти на мотори
                 if (toyChar) {
-                    // Відправляємо байти на обидва мотори (якщо іграшка підтримує)
+                    // Формат: [Префікс, Швидкість 1, Швидкість 2]
                     toyChar.writeValueWithoutResponse(new Uint8Array([0xFF, data.m1, data.m2]));
                 }
-            });
-        }
-
-        async function connectBT() {
-            try {
-                const device = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: ['0000fee9-0000-1000-8000-00805f9b34fb']
-                });
-                const server = await device.gatt.connect();
-                const services = await server.getPrimaryServices();
-                for (let s of services) {
-                    const chars = await s.getCharacteristics();
-                    toyChar = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
-                    if (toyChar) break;
-                }
-                if (toyChar) addLog("✅ ІГРАШКА ГОТОВА");
-            } catch (e) { addLog("BT Error: " + e); }
-        }
-    </script>
+            } catch (e) { console.log(e); }
+        });
+    }
+</script>
 </body>
 </html>

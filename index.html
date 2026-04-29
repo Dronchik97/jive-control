@@ -1,62 +1,20 @@
 <!DOCTYPE html>
-<html>
+<html lang="uk">
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <meta charset="UTF-8">
+    <title>Jive Control - Start</title>
     <style>
-        body { background: #000; color: #0f0; font-family: monospace; text-align: center; padding: 20px; }
-        .status-box { border: 2px solid #333; padding: 20px; margin: 20px 0; border-radius: 15px; }
-        #my-id { font-size: 28px; color: #fff; background: #222; padding: 10px; display: inline-block; margin: 10px 0; }
-        button { background: #111; color: #0f0; border: 2px solid #0f0; padding: 20px; width: 100%; cursor: pointer; font-weight: bold; border-radius: 10px; }
+        body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; font-family: sans-serif; }
+        .start-btn { 
+            background: transparent; color: #00ff41; border: 2px solid #00ff41; 
+            padding: 20px 40px; font-size: 20px; cursor: pointer; border-radius: 50px;
+            text-transform: uppercase; letter-spacing: 2px; transition: 0.3s;
+            box-shadow: 0 0 15px rgba(0,255,41,0.2);
+        }
+        .start-btn:hover { background: #00ff41; color: #000; box-shadow: 0 0 30px #00ff41; }
     </style>
 </head>
 <body>
-    <h2>🤖 ПРИЙМАЧ (БІЛЯ ІГРАШКИ)</h2>
-    <button onclick="connBT()">1. ПІДКЛЮЧИТИ BLUETOOTH</button>
-    
-    <div class="status-box">
-        <p>ID ДЛЯ КЕРУВАННЯ:</p>
-        <div id="my-id">Генерація...</div>
-        <p id="net-stat">Очікування підключення з мережі...</p>
-    </div>
-
-    <script>
-        let ch;
-        // Bluetooth
-        async function connBT() {
-            try {
-                const d = await navigator.bluetooth.requestDevice({
-                    acceptAllDevices: true,
-                    optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
-                });
-                const s = await d.gatt.connect();
-                const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
-                ch = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-                alert("Bluetooth підключено!");
-            } catch(e) { alert("BT Error: " + e.message); }
-        }
-
-        // PeerJS (Інтернет)
-        const peer = new Peer('12345678'); 
-        peer.on('open', (id) => { document.getElementById('my-id').innerText = id; });
-
-        peer.on('connection', (conn) => {
-            document.getElementById('net-stat').innerText = "✅ ПУЛЬТ ПІДКЛЮЧЕНО!";
-            document.getElementById('net-stat').style.color = "#ffff00";
-
-            conn.on('data', async (data) => {
-                if (!ch) return;
-                let v = data.val;
-                
-                if (data.type === 'v') { // Вібро (Long)
-                    let pkt = new Uint8Array([0x15, 0xFF, 0x04, 0x08, v, v, 0x00, 0x04, 0x08, v, v, 0x01]);
-                    await ch.writeValueWithoutResponse(pkt);
-                } 
-                else if (data.type === 'p') { // Толкачка (Short)
-                    await ch.writeValueWithoutResponse(new Uint8Array([0x00, 0x08, v]));
-                }
-            });
-        });
-    </script>
+    <button class="start-btn" onclick="location.href='remote.html'">Ввійти в пульт</button>
 </body>
 </html>

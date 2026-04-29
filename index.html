@@ -2,7 +2,7 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Jive Server | Poltava Final</title>
+    <title>Jive Server | Poltava Fix</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { background: #050505; color: #00ff41; font-family: monospace; text-align: center; padding: 20px; }
@@ -14,7 +14,7 @@
 </head>
 <body>
     <div class="box">
-        <h3>🛰️ SERVER ADM</h3>
+        <h3>🛰️ SERVER ADM (FIXED)</h3>
         <button onclick="connectBT()">🔗 1. ПІДКЛЮЧИТИ CBT001</button>
         <div id="btStat" style="color:red; font-size:12px; margin-bottom:15px;">BT: OFF</div>
         
@@ -33,7 +33,7 @@
             try {
                 const device = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
-                    optionalServices: ['0000fee9-0000-1000-8000-00805f9b34fb']
+                    optionalServices: ['6e400001-b5a3-f393-e0a9-e50e24dcca9e', '0000fee9-0000-1000-8000-00805f9b34fb']
                 });
                 const server = await device.gatt.connect();
                 const services = await server.getPrimaryServices();
@@ -45,7 +45,7 @@
                 if (toyChar) {
                     document.getElementById('btStat').innerText = "✅ ПІДКЛЮЧЕНО";
                     document.getElementById('btStat').style.color = "#00ff41";
-                    addLog("Зв'язок з іграшкою є.");
+                    addLog("Зв'язок є. Готовий до тексту.");
                 }
             } catch (e) { addLog("BT Error: " + e.message); }
         }
@@ -59,11 +59,16 @@
                 addLog("Пульт зайшов.");
                 conn.on('data', (data) => {
                     if (toyChar) {
-                        // ТА САМА ПАЧКА БАЙТІВ, ЯКА ПРАЦЮВАЛА
-                        // Ми ж тоді вияснили, шо треба слати саме так!
-                        const cmd = new Uint8Array([0x01, 0x01, data.m1, 0x01, 0x02, data.m2]);
-                        toyChar.writeValueWithoutResponse(cmd);
-                        addLog(`M1: ${data.m1}, M2: ${data.m2}`);
+                        // ТА САМА ЛОГІКА: "Vibrate:X;" для одного і "Rotate:X;" для іншого
+                        // Переганяємо текст в байти, бо іграшка хаває ASCII
+                        const val1 = Math.floor(data.m1 / 12.75); // конвертим 0-255 в 0-20 (як вони люблять)
+                        const val2 = Math.floor(data.m2 / 12.75);
+                        
+                        const cmdText = `Vibrate:${val1};Rotate:${val2};`;
+                        const encoder = new TextEncoder();
+                        toyChar.writeValueWithoutResponse(encoder.encode(cmdText));
+                        
+                        addLog(`CMD: ${cmdText}`);
                     }
                 });
             });

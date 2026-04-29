@@ -1,62 +1,67 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <title>Jive Control - Lovense Analog</title>
     <style>
-        body { background: #000; color: #0f0; font-family: monospace; text-align: center; padding: 20px; }
-        .status-box { border: 2px solid #333; padding: 20px; margin: 20px 0; border-radius: 15px; }
-        #my-id { font-size: 28px; color: #fff; background: #222; padding: 10px; display: inline-block; margin: 10px 0; }
-        button { background: #111; color: #0f0; border: 2px solid #0f0; padding: 20px; width: 100%; cursor: pointer; font-weight: bold; border-radius: 10px; }
+        body { background: #000; color: #0f0; font-family: 'Courier New', monospace; text-align: center; padding: 20px; }
+        .panel { border: 2px solid #0f0; padding: 20px; border-radius: 15px; display: inline-block; }
+        .status { margin: 10px; padding: 10px; border-radius: 5px; font-weight: bold; }
+        .active { background: #004400; border: 1px solid #0f0; }
+        .inactive { background: #440000; border: 1px solid #f00; color: #f00; }
+        button { background: #0f0; color: #000; border: none; padding: 15px 30px; font-weight: bold; cursor: pointer; border-radius: 5px; }
     </style>
 </head>
 <body>
-    <h2>🤖 ПРИЙМАЧ (БІЛЯ ІГРАШКИ)</h2>
-    <button onclick="connBT()">1. ПІДКЛЮЧИТИ BLUETOOTH</button>
-    
-    <div class="status-box">
-        <p>ID ДЛЯ КЕРУВАННЯ:</p>
-        <div id="my-id">Генерація...</div>
-        <p id="net-stat">Очікування підключення з мережі...</p>
+    <div class="panel">
+        <h1>🦾 JIVE-CONTROL V1.0</h1>
+        <p>Аналог Lovense для Андрія</p>
+        
+        <div id="btStatus" class="status inactive">БЛЮТУЗ: НЕМА КОНТАКТУ</div>
+        <button onclick="connectBT()">🔌 ПІДКЛЮЧИТИ ІГРАШКУ</button>
+        
+        <div id="siteStatus" class="status inactive">САЙТ: ЧЕКАЮ СИГНАЛУ</div>
     </div>
 
     <script>
-        let ch;
-        // Bluetooth
-        async function connBT() {
+        let toyChar;
+
+        async function connectBT() {
             try {
-                const d = await navigator.bluetooth.requestDevice({
+                const device = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
                     optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
                 });
-                const s = await d.gatt.connect();
-                const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
-                ch = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-                alert("Bluetooth підключено!");
-            } catch(e) { alert("BT Error: " + e.message); }
+                const server = await device.gatt.connect();
+                const service = await server.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
+                toyChar = await service.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
+                
+                document.getElementById('btStatus').innerText = "БЛЮТУЗ: КОНТАКТ Є!";
+                document.getElementById('btStatus').className = "status active";
+                startListening();
+            } catch(e) {
+                alert("Помилка: " + e);
+            }
         }
 
-        // PeerJS (Інтернет)
-        const peer = new Peer(); 
-        peer.on('open', (id) => { document.getElementById('my-id').innerText = id; });
+        function startListening() {
+            document.getElementById('siteStatus').innerText = "САЙТ: СЛУХАЮ ТОКЕНИ...";
+            document.getElementById('siteStatus').className = "status active";
 
-        peer.on('connection', (conn) => {
-            document.getElementById('net-stat').innerText = "✅ ПУЛЬТ ПІДКЛЮЧЕНО!";
-            document.getElementById('net-stat').style.color = "#ffff00";
-
-            conn.on('data', async (data) => {
-                if (!ch) return;
-                let v = data.val;
-                
-                if (data.type === 'v') { // Вібро (Long)
-                    let pkt = new Uint8Array([0x15, 0xFF, 0x04, 0x08, v, v, 0x00, 0x04, 0x08, v, v, 0x01]);
-                    await ch.writeValueWithoutResponse(pkt);
-                } 
-                else if (data.type === 'p') { // Толкачка (Short)
-                    await ch.writeValueWithoutResponse(new Uint8Array([0x00, 0x08, v]));
+            // Слухаємо команди від Lovense Extension або сайту
+            window.addEventListener('message', function(event) {
+                if (event.data && event.data.action === 'vibrate') {
+                    let intensity = event.data.value; // зазвичай 0-20
+                    sendToToy(intensity);
                 }
             });
-        });
+        }
+
+        async function sendToToy(speed) {
+            if (!toyChar) return;
+            // Твоя команда: 0x00 (хедер), 0x08 (мотор), speed (0-20)
+            let val = Math.min(Math.max(parseInt(speed), 0), 20); 
+            await toyChar.writeValueWithoutResponse(new Uint8Array([0x00, 0x08, val]));
+        }
     </script>
 </body>
 </html>

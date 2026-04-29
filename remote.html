@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        body { background: #000; color: #0f0; font-family: monospace; text-align: center; padding: 10px; }
+        .container { display: flex; justify-content: space-around; padding-top: 20px; }
+        input[type=range][orient=vertical] { appearance: slider-vertical; width: 70px; height: 300px; cursor: pointer; }
+        .val { font-size: 24px; margin-top: 10px; font-weight: bold; }
+        input[type=text] { background: #222; color: #fff; border: 1px solid #0f0; padding: 10px; width: 80%; text-align: center; font-size: 18px; }
+        button { background: #0f0; color: #000; border: none; padding: 15px; width: 85%; margin-top: 10px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h3>🎮 REMOTE CONTROL</h3>
+    
+    <input type="text" id="peer-id" placeholder="Введіть ID Приймача">
+    <button onclick="connectToHost()">ПІДКЛЮЧИТИСЬ</button>
+    <p id="status">Статус: Немає зв'язку</p>
+
+    <div class="container">
+        <div class="box">
+            <div style="color:#00ffff">📳 VIBRO</div>
+            <input type="range" id="vSlider" min="0" max="29" value="0" orient="vertical">
+            <div id="vVal" class="val" style="color:#00ffff">0</div>
+        </div>
+        <div class="box">
+            <div style="color:#ffff00">🚀 PUSHER</div>
+            <input type="range" id="pSlider" min="0" max="100" value="0" orient="vertical">
+            <div id="pVal" class="val" style="color:#ffff00">0</div>
+        </div>
+    </div>
+
+    <script>
+        let conn;
+        const peer = new Peer();
+
+        function connectToHost() {
+            const id = document.getElementById('peer-id').value;
+            conn = peer.connect(id);
+            conn.on('open', () => {
+                document.getElementById('status').innerText = "✅ ПІДКЛЮЧЕНО ДО МАШИНИ!";
+                document.getElementById('status').style.color = "#ffff00";
+            });
+        }
+
+        document.getElementById('vSlider').oninput = function() {
+            let v = parseInt(this.value);
+            let finalV = (v > 0 && v < 6) ? 6 : v;
+            document.getElementById('vVal').innerText = finalV;
+            if (conn && conn.open) conn.send({type: 'v', val: finalV});
+        };
+
+        document.getElementById('pSlider').oninput = function() {
+            let v = parseInt(this.value);
+            let finalV = (v > 0 && v < 32) ? 32 : v;
+            document.getElementById('pVal').innerText = finalV;
+            if (conn && conn.open) conn.send({type: 'p', val: finalV});
+        };
+    </script>
+</body>
+</html>

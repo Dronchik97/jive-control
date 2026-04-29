@@ -2,55 +2,71 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Jive Remote | Visual</title>
+    <title>Jive Remote | Control</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { background: #0b0e14; color: #fff; font-family: sans-serif; text-align: center; padding: 20px; }
-        .pult { max-width: 360px; margin: auto; background: #161b22; padding: 30px; border-radius: 50px; border: 2px solid #00ff41; box-shadow: 0 0 30px rgba(0,255,65,0.2); }
-        input[type="text"] { background: #000; border: 1px solid #333; color: #00ff41; padding: 15px; width: 80%; border-radius: 12px; margin-bottom: 20px; text-align: center; font-size: 18px; }
-        .slider { width: 100%; height: 25px; background: #000; border-radius: 15px; -webkit-appearance: none; margin: 30px 0; outline: none; }
+        .pult { max-width: 360px; margin: auto; background: #161b22; padding: 30px; border-radius: 50px; border: 2px solid #00ff41; }
+        input[type="text"] { background: #000; border: 1px solid #333; color: #00ff41; padding: 15px; width: 85%; border-radius: 12px; margin-bottom: 20px; text-align: center; font-size: 18px; }
+        .slider-group { margin: 30px 0; }
+        .label { color: #00ff41; font-weight: bold; text-transform: uppercase; margin-bottom: 10px; display: block; }
+        .slider { width: 100%; height: 25px; background: #000; border-radius: 15px; -webkit-appearance: none; outline: none; }
         .slider::-webkit-slider-thumb { -webkit-appearance: none; width: 45px; height: 45px; background: #00ff41; border-radius: 50%; cursor: pointer; box-shadow: 0 0 15px #00ff41; }
-        .label { font-size: 14px; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
+        .btn-stop { background: #ff4141; color: #fff; border: none; padding: 20px; width: 100%; border-radius: 20px; font-weight: bold; font-size: 20px; cursor: pointer; margin-top: 20px; box-shadow: 0 0 20px rgba(255,65,65,0.3); }
+        #val1, #val2 { font-size: 20px; font-family: monospace; }
     </style>
 </head>
 <body>
+    <div class="pult">
+        <div id="login">
+            <h3>ВВЕДИ ID СЕРВЕРА</h3>
+            <input type="text" id="targetId" placeholder="Наприклад: andrii_vibe">
+            <button onclick="connect()" style="background:#00ff41; padding:18px; border:none; width:95%; border-radius:15px; font-weight:bold; cursor:pointer;">З'ЄДНАТИСЬ</button>
+        </div>
 
-<div class="pult">
-    <div id="login">
-        <h3>ВВЕДИ ID СЕРВЕРА</h3>
-        <input type="text" id="targetId" placeholder="Наприклад: andrii777">
-        <button onclick="connect()" style="background:#00ff41; padding:18px; border:none; width:90%; border-radius:15px; font-weight:bold; cursor:pointer;">З'ЄДНАТИСЬ</button>
+        <div id="ctrl" style="display:none;">
+            <div class="slider-group">
+                <span class="label">ВІБРАЦІЯ: <span id="val1">0</span></span>
+                <input type="range" min="0" max="255" value="0" class="slider" id="s1" oninput="sync()">
+            </div>
+            
+            <div class="slider-group">
+                <span class="label">РИТМ / МОТОР 2: <span id="val2">0</span></span>
+                <input type="range" min="0" max="255" value="0" class="slider" id="s2" oninput="sync()">
+            </div>
+            
+            <button class="btn-stop" onclick="stopAll()">⛔ STOP ALL</button>
+        </div>
     </div>
 
-    <div id="ctrl" style="display:none;">
-        <h2 style="color:#00ff41; letter-spacing: 2px;">UNIT ACTIVE</h2>
-        <div class="label">МОТОР 1</div>
-        <input type="range" min="0" max="255" value="0" class="slider" id="s1" oninput="sync()">
-        <div class="label">МОТОР 2</div>
-        <input type="range" min="0" max="255" value="0" class="slider" id="s2" oninput="sync()">
-    </div>
-</div>
+    <script>
+        const peer = new Peer();
+        let conn;
 
-<script>
-    const peer = new Peer();
-    let conn;
-
-    function connect() {
-        const id = document.getElementById('targetId').value;
-        conn = peer.connect(id);
-        conn.on('open', () => {
-            document.getElementById('login').style.display = 'none';
-            document.getElementById('ctrl').style.display = 'block';
-        });
-    }
-
-    function sync() {
-        if (conn && conn.open) {
-            const m1 = parseInt(document.getElementById('s1').value);
-            const m2 = parseInt(document.getElementById('s2').value);
-            conn.send({ m1, m2 });
+        function connect() {
+            const id = document.getElementById('targetId').value;
+            conn = peer.connect(id);
+            conn.on('open', () => {
+                document.getElementById('login').style.display = 'none';
+                document.getElementById('ctrl').style.display = 'block';
+            });
         }
-    }
-</script>
+
+        function sync() {
+            if (conn && conn.open) {
+                const m1 = parseInt(document.getElementById('s1').value);
+                const m2 = parseInt(document.getElementById('s2').value);
+                document.getElementById('val1').innerText = m1;
+                document.getElementById('val2').innerText = m2;
+                conn.send({ m1, m2 });
+            }
+        }
+
+        function stopAll() {
+            document.getElementById('s1').value = 0;
+            document.getElementById('s2').value = 0;
+            sync();
+        }
+    </script>
 </body>
 </html>

@@ -2,29 +2,22 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Jive Server | Fix</title>
+    <title>Jive Server | Admin</title>
     <style>
         body { background: #050505; color: #00ff41; font-family: monospace; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
-        .server-box { border: 2px solid #00ff41; padding: 30px; border-radius: 20px; background: #111; width: 350px; text-align: center; }
+        .server-box { border: 2px solid #00ff41; padding: 30px; border-radius: 20px; background: #111; width: 350px; text-align: center; box-shadow: 0 0 20px rgba(0,255,65,0.2); }
         button { background: #00ff41; color: #000; border: none; padding: 15px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; margin-top: 10px; text-transform: uppercase; }
-        input { background: #000; border: 1px solid #333; color: #00ff41; padding: 10px; width: 85%; margin: 15px 0; text-align: center; }
-        #log { font-size: 10px; color: #666; margin-top: 20px; height: 60px; overflow-y: auto; text-align: left; border-top: 1px solid #222; padding-top: 10px; }
+        #log { font-size: 10px; color: #666; margin-top: 20px; height: 100px; overflow-y: auto; text-align: left; border-top: 1px solid #222; padding-top: 10px; }
+        .status { margin-bottom: 20px; font-size: 18px; font-bold: true; }
     </style>
 </head>
 <body>
 
 <div class="server-box">
-    <h2>🛠️ SERVER CONTROL</h2>
+    <h2>🛠️ JIVE SERVER</h2>
+    <div class="status" id="btStat">ОЧІКУВАННЯ...</div>
     
-    <div id="btStat" style="margin-bottom: 15px;">СТАТУС: ГОТОВИЙ</div>
-    
-    <button onclick="connectAny()">1. ПІДКЛЮЧИТИ ІГРАШКУ</button>
-
-    <hr style="border: 0.5px solid #222; margin: 20px 0;">
-
-    <div class="label">ПАРОЛЬ ДЛЯ КЛІЄНТА:</div>
-    <input type="text" id="passId" placeholder="Введи пароль тут">
-    <button onclick="setPass()">2. ЗБЕРЕГТИ ПАРОЛЬ</button>
+    <button onclick="connectHardware()">ПІДКЛЮЧИТИ ЗАЛІЗО</button>
     
     <div id="log"></div>
 </div>
@@ -38,31 +31,24 @@
         log.scrollTop = log.scrollHeight;
     }
 
-    async function connectAny() {
+    async function connectHardware() {
         try {
-            document.getElementById('btStat').innerText = "🔍 ПОШУК...";
-            
-            // ПРИБРАЛИ UUID ФІЛЬТР - тепер бачить все!
+            document.getElementById('btStat').innerText = "🔍 ШУКАЮ...";
             const device = await navigator.bluetooth.requestDevice({
                 acceptAllDevices: true,
-                optionalServices: [] // Дозволяємо браузеру запитувати будь-які сервіси
+                optionalServices: ['0000fee9-0000-1000-8000-00805f9b34fb'] 
             });
 
-            addLog("Зачепився за: " + device.name);
             const server = await device.gatt.connect();
-            
-            // Автоматично шукаємо ПЕРШИЙ доступний сервіс
+            addLog("З'єднано з: " + device.name);
+
+            // Шукаємо сервіс і характеристику
             const services = await server.getPrimaryServices();
-            if (services.length === 0) throw new Error("Сервіси не знайдені");
-            
-            addLog("Знайдено сервісів: " + services.length);
-            
-            // Перебираємо сервіси, поки не знайдемо робочу характеристику
             for (let service of services) {
                 const chars = await service.getCharacteristics();
                 toyChar = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
                 if (toyChar) {
-                    addLog("Знайдено канал: " + service.uuid);
+                    addLog("Канал знайдено: " + service.uuid);
                     break;
                 }
             }
@@ -70,20 +56,25 @@
             if (toyChar) {
                 document.getElementById('btStat').innerText = "✅ ПІДКЛЮЧЕНО";
                 document.getElementById('btStat').style.color = "#00ff41";
-            } else {
-                addLog("Не знайдено канал запису!");
+                startListening(); // Починаємо чекати команди з пульта
             }
-
         } catch (e) {
-            addLog("ПОМИЛКА: " + e.message);
+            addLog("Помилка: " + e.message);
             document.getElementById('btStat').innerText = "⚠️ ЗБІЙ";
         }
     }
 
-    function setPass() {
-        const pass = document.getElementById('passId').value;
-        localStorage.setItem('remote_pass', pass);
-        addLog("Пароль '" + pass + "' збережено!");
+    function startListening() {
+        addLog("Сервер активний. Слухаю команди...");
+        window.addEventListener('storage', (event) => {
+            if (event.key === 'vibe_cmd') {
+                const speed = parseInt(event.newValue);
+                if (toyChar) {
+                    toyChar.writeValueWithoutResponse(new Uint8Array([0xFF, speed]));
+                    addLog("Команда: " + speed);
+                }
+            }
+        });
     }
 </script>
 </body>

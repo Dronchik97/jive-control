@@ -2,33 +2,31 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Jive Remote | 2 Sliders</title>
+    <title>Jive Remote | Poltava</title>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
         body { background: #0b0e14; color: #fff; font-family: sans-serif; text-align: center; padding: 20px; }
         .pult { max-width: 350px; margin: auto; background: #161b22; padding: 30px; border-radius: 40px; border: 2px solid #00ff41; }
         input[type="text"] { background: #000; border: 1px solid #333; color: #00ff41; padding: 15px; width: 80%; border-radius: 10px; margin-bottom: 20px; text-align: center; }
         .slider { width: 100%; height: 15px; background: #000; border-radius: 10px; -webkit-appearance: none; margin: 20px 0; }
-        .slider::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; background: #00ff41; border-radius: 50%; cursor: pointer; }
-        .btn-stop { background: #ff4141; color: #000; border: none; padding: 15px; width: 100%; border-radius: 15px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        .label { font-size: 12px; color: #888; text-transform: uppercase; }
+        .slider::-webkit-slider-thumb { -webkit-appearance: none; width: 35px; height: 35px; background: #00ff41; border-radius: 50%; cursor: pointer; }
+        .btn-stop { background: #ff4141; color: #000; border: none; padding: 20px; width: 100%; border-radius: 15px; font-weight: bold; cursor: pointer; margin-top: 10px; }
     </style>
 </head>
 <body>
     <div class="pult">
         <div id="login">
-            <input type="text" id="roomId" placeholder="ВВЕДИ ID СЕРВЕРА">
+            <h3>ВВЕДІТЬ ID СЕРВЕРА</h3>
+            <input type="text" id="roomId" placeholder="Пароль з сервера">
             <button onclick="connectToHub()" style="background:#00ff41; padding:15px; border:none; width:90%; border-radius:10px; font-weight:bold;">УВІЙТИ</button>
         </div>
 
         <div id="ctrl" style="display:none;">
-            <div class="label">Потужність 1</div>
+            <p>МОТОР 1</p>
             <input type="range" min="0" max="255" value="0" class="slider" id="s1" oninput="sync()">
-            
-            <div class="label">Потужність 2</div>
+            <p>МОТОР 2</p>
             <input type="range" min="0" max="255" value="0" class="slider" id="s2" oninput="sync()">
-            
-            <button class="btn-stop" onclick="stopAll()">STOP ALL</button>
+            <button class="btn-stop" onclick="stopAll()">STOP</button>
         </div>
     </div>
 
@@ -38,7 +36,6 @@
         function connectToHub() {
             currentId = document.getElementById('roomId').value;
             if(!currentId) return;
-            
             mqttClient = mqtt.connect('wss://test.mosquitto.org:8081');
             mqttClient.on('connect', () => {
                 document.getElementById('login').style.display = 'none';

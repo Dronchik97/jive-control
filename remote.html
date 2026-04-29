@@ -2,37 +2,62 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Jive Remote | Global</title>
+    <title>Jive Remote | 2 Sliders</title>
     <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
     <style>
-        body { background: #0b0e14; color: #fff; font-family: sans-serif; text-align: center; padding: 50px 20px; }
-        .pult { max-width: 400px; margin: auto; background: #161b22; padding: 40px; border-radius: 50px; border: 2px solid #00ff41; }
-        .slider { width: 100%; height: 15px; background: #000; border-radius: 10px; -webkit-appearance: none; margin: 40px 0; }
-        .slider::-webkit-slider-thumb { -webkit-appearance: none; width: 40px; height: 40px; background: #00ff41; border-radius: 50%; cursor: pointer; box-shadow: 0 0 15px #00ff41; }
-        .btn-stop { background: #ff4141; color: #000; border: none; padding: 20px; width: 100%; border-radius: 20px; font-weight: bold; font-size: 18px; cursor: pointer; }
-        #val { font-size: 40px; color: #00ff41; font-weight: bold; }
+        body { background: #0b0e14; color: #fff; font-family: sans-serif; text-align: center; padding: 20px; }
+        .pult { max-width: 350px; margin: auto; background: #161b22; padding: 30px; border-radius: 40px; border: 2px solid #00ff41; }
+        input[type="text"] { background: #000; border: 1px solid #333; color: #00ff41; padding: 15px; width: 80%; border-radius: 10px; margin-bottom: 20px; text-align: center; }
+        .slider { width: 100%; height: 15px; background: #000; border-radius: 10px; -webkit-appearance: none; margin: 20px 0; }
+        .slider::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; background: #00ff41; border-radius: 50%; cursor: pointer; }
+        .btn-stop { background: #ff4141; color: #000; border: none; padding: 15px; width: 100%; border-radius: 15px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .label { font-size: 12px; color: #888; text-transform: uppercase; }
     </style>
 </head>
 <body>
     <div class="pult">
-        <h2>JIVE REMOTE</h2>
-        <div id="val">0%</div>
-        <input type="range" min="0" max="255" value="0" class="slider" oninput="sendSpeed(this.value)">
-        <button class="btn-stop" onclick="sendSpeed(0)">STOP</button>
-        <div id="status" style="margin-top:20px; font-size:10px; color:#444;">CONNECTING TO CLOUD...</div>
+        <div id="login">
+            <input type="text" id="roomId" placeholder="ВВЕДИ ID СЕРВЕРА">
+            <button onclick="connectToHub()" style="background:#00ff41; padding:15px; border:none; width:90%; border-radius:10px; font-weight:bold;">УВІЙТИ</button>
+        </div>
+
+        <div id="ctrl" style="display:none;">
+            <div class="label">Потужність 1</div>
+            <input type="range" min="0" max="255" value="0" class="slider" id="s1" oninput="sync()">
+            
+            <div class="label">Потужність 2</div>
+            <input type="range" min="0" max="255" value="0" class="slider" id="s2" oninput="sync()">
+            
+            <button class="btn-stop" onclick="stopAll()">STOP ALL</button>
+        </div>
     </div>
 
     <script>
-        const TOPIC = "andrii_jive_vibe_999";
-        const client = mqtt.connect('wss://test.mosquitto.org:8081');
+        let mqttClient, currentId;
 
-        client.on('connect', () => {
-            document.getElementById('status').innerText = "CONNECTED TO SERVER";
-        });
+        function connectToHub() {
+            currentId = document.getElementById('roomId').value;
+            if(!currentId) return;
+            
+            mqttClient = mqtt.connect('wss://test.mosquitto.org:8081');
+            mqttClient.on('connect', () => {
+                document.getElementById('login').style.display = 'none';
+                document.getElementById('ctrl').style.display = 'block';
+            });
+        }
 
-        function sendSpeed(val) {
-            document.getElementById('val').innerText = Math.round((val/255)*100) + "%";
-            client.publish(TOPIC, val.toString());
+        function sync() {
+            const m1 = document.getElementById('s1').value;
+            const m2 = document.getElementById('s2').value;
+            if(mqttClient) {
+                mqttClient.publish("jive/" + currentId, JSON.stringify({m1: parseInt(m1), m2: parseInt(m2)}));
+            }
+        }
+
+        function stopAll() {
+            document.getElementById('s1').value = 0;
+            document.getElementById('s2').value = 0;
+            sync();
         }
     </script>
 </body>

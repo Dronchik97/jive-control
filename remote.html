@@ -2,91 +2,67 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Jive Remote - Manual Mode</title>
+    <title>Jive Remote | Client</title>
     <style>
-        /* Весь той самий дизайн пульта, шо ми робили раніше */
         :root { --neon: #00ff41; }
-        body { background: #000; color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; font-family: sans-serif; }
-        .remote-case { width: 240px; height: 480px; background: #111; border: 2px solid #222; border-radius: 55px; padding: 30px; text-align: center; position: relative; }
-        #vibe-level { width: 10px; background: var(--neon); position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); transition: 0.1s; box-shadow: 0 0 15px var(--neon); }
-        .bar-bg { width: 10px; height: 150px; background: #000; margin: 20px auto; position: relative; border-radius: 5px; }
-        #statusInfo { font-size: 11px; color: #444; margin-top: 10px; }
+        body { background: #0b0e14; color: #fff; font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .pult { width: 300px; background: #161b22; border-radius: 40px; padding: 30px; border: 2px solid var(--neon); box-shadow: 0 0 30px rgba(0,255,65,0.2); text-align: center; }
+        
+        .input-group { margin-bottom: 25px; }
+        input[type="text"] { background: #000; border: 1px solid #333; color: var(--neon); padding: 10px; border-radius: 10px; width: 80%; text-align: center; }
+        
+        /* СТИЛЬНИЙ ПОВЗУНОК */
+        .slider { width: 100%; margin: 30px 0; -webkit-appearance: none; background: #000; height: 10px; border-radius: 5px; outline: none; }
+        .slider::-webkit-slider-thumb { -webkit-appearance: none; width: 25px; height: 25px; background: var(--neon); border-radius: 50%; cursor: pointer; box-shadow: 0 0 10px var(--neon); }
+
+        .btn-stop { background: #ff4141; color: #000; border: none; padding: 15px; width: 100%; border-radius: 15px; font-weight: bold; cursor: pointer; text-transform: uppercase; margin-top: 10px; }
+        .btn-send { background: var(--neon); color: #000; border: none; padding: 15px; width: 100%; border-radius: 15px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
     </style>
 </head>
 <body>
 
-<div class="remote-case">
-    <div style="font-size: 10px; color: #666; margin-bottom: 20px;">TARGET ID: <br><span id="targetId" style="color:#00ff41">???</span></div>
-    
-    <div class="bar-bg">
-        <div id="vibe-level" style="height: 0%;"></div>
+<div class="pult">
+    <div id="loginSection">
+        <h3>ВВЕДІТЬ ID ПУЛЬТА</h3>
+        <input type="text" id="clientPass" placeholder="Пароль від стрімера">
+        <button class="btn-send" style="margin-top:15px;" onclick="checkAccess()">УВІЙТИ</button>
     </div>
 
-    <button onclick="linkToId()" style="background:#00ff41; color:#000; border:none; padding:15px; width:100%; border-radius:12px; font-weight:bold; cursor:pointer;">ПІДКЛЮЧИТИСЯ</button>
-    
-    <div id="statusInfo">Очікування...</div>
+    <div id="controlSection" style="display:none;">
+        <h2 style="color:var(--neon)">📡 REMOTE CONTROL</h2>
+        
+        <p>ІНТЕНСИВНІСТЬ:</p>
+        <input type="range" min="0" max="255" value="0" class="slider" id="vibeRange" oninput="updateRange(this.value)">
+        <div id="valDisplay">0%</div>
+
+        <button class="btn-stop" onclick="stopVibe()">⛔ STOP</button>
+    </div>
 </div>
 
 <script>
-    let toyChar;
-    let audioCtx, analyser, dataArr;
-    
-    // Беремо твій ID з пам'яті
-    const myCustomId = localStorage.getItem('lastDeviceId');
-    document.getElementById('targetId').innerText = myCustomId || "Не задано";
-
-    async function linkToId() {
-        try {
-            document.getElementById('statusInfo').innerText = "Шукаю твій ID...";
-            
-            // Браузер все одно спитає підтвердження, але ми фільтруємо по твому ID
-            const device = await navigator.bluetooth.requestDevice({
-                filters: [{ id: myCustomId }],
-                optionalServices: ['0000fee9-0000-1000-8000-00805f9b34fb']
-            });
-
-            const server = await device.gatt.connect();
-            const service = await server.getPrimaryService('0000fee9-0000-1000-8000-00805f9b34fb');
-            const chars = await service.getCharacteristics();
-            toyChar = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
-
-            if (toyChar) {
-                document.getElementById('statusInfo').innerText = "ЗВ'ЯЗОК Є!";
-                startAudio();
-            }
-        } catch (e) {
-            document.getElementById('statusInfo').innerText = "Помилка: " + e;
+    function checkAccess() {
+        const input = document.getElementById('clientPass').value;
+        const saved = localStorage.getItem('remote_pass');
+        
+        if(input === saved) {
+            document.getElementById('loginSection').style.display = 'none';
+            document.getElementById('controlSection').style.display = 'block';
+        } else {
+            alert("Невірний ID!");
         }
     }
 
-    async function startAudio() {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        audioCtx = new AudioContext();
-        const source = audioCtx.createMediaStreamSource(stream);
-        analyser = audioCtx.createAnalyser();
-        analyser.fftSize = 256;
-        source.connect(analyser);
-        dataArr = new Uint8Array(analyser.frequencyBinCount);
-        monitor();
+    function updateRange(val) {
+        let percent = Math.round((val / 255) * 100);
+        document.getElementById('valDisplay').innerText = percent + "%";
+        // Тут ми шлемо команду (якщо реалізовано через сокети або спільну пам'ять)
+        console.log("Швидкість: " + val);
     }
 
-    function monitor() {
-        analyser.getByteFrequencyData(dataArr);
-        let sum = 0;
-        for (let i = 0; i < dataArr.length; i++) sum += dataArr[i];
-        let vol = Math.round(sum / dataArr.length);
-
-        document.getElementById('vibe-level').style.height = Math.min(vol * 2.5, 100) + "%";
-
-        if (vol > 15 && toyChar) {
-            let speed = Math.min(vol * 5, 255);
-            toyChar.writeValueWithoutResponse(new Uint8Array([0xFF, speed]));
-        } else if (toyChar) {
-            toyChar.writeValueWithoutResponse(new Uint8Array([0xFF, 0]));
-        }
-        requestAnimationFrame(monitor);
+    function stopVibe() {
+        document.getElementById('vibeRange').value = 0;
+        updateRange(0);
     }
 </script>
-
 </body>
 </html>

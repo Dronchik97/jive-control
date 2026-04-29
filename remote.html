@@ -2,13 +2,13 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Jive Remote | Control</title>
+    <title>Jive Remote</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { background: #0b0e14; color: #fff; font-family: sans-serif; text-align: center; padding: 20px; }
         .pult { max-width: 360px; margin: auto; background: #161b22; padding: 30px; border-radius: 50px; border: 2px solid #00ff41; }
         input[type="text"] { background: #000; border: 1px solid #333; color: #00ff41; padding: 15px; width: 85%; border-radius: 12px; margin-bottom: 20px; text-align: center; font-size: 18px; }
-        .label { color: #00ff41; font-weight: bold; display: block; margin: 20px 0 10px; text-transform: uppercase; }
+        .label { color: #00ff41; font-weight: bold; display: block; margin: 25px 0 10px; text-transform: uppercase; }
         .slider { width: 100%; height: 25px; background: #000; border-radius: 15px; -webkit-appearance: none; outline: none; }
         .slider::-webkit-slider-thumb { -webkit-appearance: none; width: 45px; height: 45px; background: #00ff41; border-radius: 50%; cursor: pointer; }
         .btn-stop { background: #ff4141; color: #fff; border: none; padding: 20px; width: 100%; border-radius: 20px; font-weight: bold; font-size: 20px; cursor: pointer; margin-top: 30px; }
@@ -17,26 +17,20 @@
 <body>
     <div class="pult">
         <div id="login">
-            <h3>ВВЕДИ ID</h3>
-            <input type="text" id="targetId" placeholder="ID сервера">
-            <button onclick="connect()" style="background:#00ff41; padding:18px; border:none; width:95%; border-radius:15px; font-weight:bold;">УВІЙТИ</button>
+            <input type="text" id="targetId" placeholder="ВВЕДИ ID СЕРВЕРА">
+            <button onclick="connect()" style="background:#00ff41; padding:18px; border:none; width:95%; border-radius:15px; font-weight:bold;">З'ЄДНАТИСЬ</button>
         </div>
-
         <div id="ctrl" style="display:none;">
-            <span class="label">ВІБРО (0-255): <span id="v1">0</span></span>
+            <span class="label">ВІБРО (M1): <span id="v1">0</span></span>
             <input type="range" min="0" max="255" value="0" class="slider" id="s1" oninput="sync()">
-            
-            <span class="label">ТОЛКАЧКИ (0-255): <span id="v2">0</span></span>
+            <span class="label">ТОЛКАЧКИ (M2): <span id="v2">0</span></span>
             <input type="range" min="0" max="255" value="0" class="slider" id="s2" oninput="sync()">
-            
-            <button class="btn-stop" onclick="stopAll()">⛔ STOP ALL</button>
+            <button class="btn-stop" onclick="stopAll()">STOP</button>
         </div>
     </div>
-
     <script>
         const peer = new Peer();
         let conn;
-
         function connect() {
             const id = document.getElementById('targetId').value;
             conn = peer.connect(id);
@@ -45,7 +39,6 @@
                 document.getElementById('ctrl').style.display = 'block';
             });
         }
-
         function sync() {
             if (conn && conn.open) {
                 const m1 = parseInt(document.getElementById('s1').value);
@@ -55,7 +48,6 @@
                 conn.send({ m1, m2 });
             }
         }
-
         function stopAll() {
             document.getElementById('s1').value = 0;
             document.getElementById('s2').value = 0;

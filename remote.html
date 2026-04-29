@@ -1,91 +1,106 @@
 <!DOCTYPE html>
-<html>
+<html lang="uk">
 <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <meta charset="UTF-8">
+    <title>Jive Remote - Client View</title>
     <style>
-        body { background: #000; color: #0f0; font-family: monospace; text-align: center; padding: 10px; margin: 0; }
-        .container { display: flex; justify-content: space-around; padding-top: 15px; }
-        .box { width: 45%; display: flex; flex-direction: column; align-items: center; }
-        input[type=range][orient=vertical] { appearance: slider-vertical; width: 70px; height: 320px; cursor: pointer; }
-        .val { font-size: 26px; margin-top: 10px; font-weight: bold; }
-        
-        .header-ui { background: #111; padding: 15px; border-bottom: 2px solid #333; margin-bottom: 10px; }
-        input[type=text] { background: #000; color: #0f0; border: 1px solid #0f0; padding: 10px; width: 70%; text-align: center; font-size: 16px; margin-bottom: 10px; }
-        
-        button { background: #0f0; color: #000; border: none; padding: 12px; width: 80%; font-weight: bold; cursor: pointer; border-radius: 5px; }
-        .btn-stop { background: #ff0000; color: #fff; width: 90%; padding: 20px; font-size: 20px; margin-top: 25px; border-radius: 10px; }
-        
-        #status { font-size: 12px; margin: 10px 0; color: #888; }
+        :root { --neon: #00ff41; --black: #0a0a0b; }
+        body { background: transparent; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
+
+        /* КОРПУС ПУЛЬТА */
+        .remote-case {
+            width: 240px; height: 480px;
+            background: linear-gradient(145deg, #1a1a1c, #020202);
+            border-radius: 55px; border: 2px solid #222;
+            box-shadow: 0 40px 80px rgba(0,0,0,0.9), inset 0 0 15px rgba(255,255,255,0.05);
+            display: flex; flex-direction: column; align-items: center;
+            padding: 30px 15px; position: relative;
+        }
+
+        /* Назва іграшки */
+        .logo { font-size: 9px; letter-spacing: 5px; color: #444; margin-bottom: 30px; text-transform: uppercase; }
+
+        /* СВІТЛОВЕ КОЛО (Реагує на вібрацію) */
+        .led-circle {
+            width: 90px; height: 90px; border-radius: 50%;
+            background: #111; border: 3px solid #1a1a1a;
+            display: flex; justify-content: center; align-items: center;
+            margin-bottom: 40px; position: relative; box-shadow: inset 0 0 10px #000;
+        }
+
+        #glow-effect {
+            position: absolute; width: 100%; height: 100%; border-radius: 50%;
+            background: var(--neon); filter: blur(15px); opacity: 0; transition: opacity 0.1s;
+        }
+
+        .status-led { width: 10px; height: 10px; background: #222; border-radius: 50%; z-index: 2; transition: 0.3s; }
+        .connected .status-led { background: var(--neon); box-shadow: 0 0 15px var(--neon); }
+
+        /* ВЕРТИКАЛЬНА ШКАЛА */
+        .vibe-bar {
+            width: 6px; height: 140px; background: #000;
+            border-radius: 10px; position: relative; border: 1px solid #1a1a1a; margin-bottom: 30px;
+        }
+
+        #vibe-level {
+            width: 100%; height: 0%; background: var(--neon);
+            position: absolute; bottom: 0; border-radius: 10px;
+            box-shadow: 0 0 15px var(--neon); transition: height 0.1s;
+        }
+
+        /* ТЕХНІЧНА ІНФА */
+        .info { font-size: 10px; color: #333; font-family: monospace; }
+
+        /* ПРИХОВАНІ КНОПКИ (тільки для тебе, клієнт їх не бачить якщо підкрутиш стилі) */
+        .actions { margin-top: 20px; width: 100%; }
+        button { 
+            width: 100%; background: rgba(255,255,255,0.03); border: 1px solid #222; 
+            color: #444; padding: 10px; border-radius: 10px; cursor: pointer; font-size: 10px;
+        }
+        button:hover { color: var(--neon); border-color: var(--neon); }
     </style>
 </head>
 <body>
 
-    <div class="header-ui">
-        <input type="text" id="peer-id" placeholder="Введіть ID">
-        <button onclick="connectToHost()">🔗 ПІДКЛЮЧИТИСЬ</button>
-        <div id="status">Статус: Очікування...</div>
+<div class="remote-case" id="toy">
+    <div class="logo">REMOTE UNIT</div>
+
+    <div class="led-circle">
+        <div id="glow-effect"></div>
+        <div class="status-led"></div>
     </div>
 
-    <div class="container">
-        <div class="box">
-            <div style="color:#00ffff; font-size: 12px;">📳 VIBRO</div>
-            <input type="range" id="vSlider" min="0" max="29" value="0" orient="vertical">
-            <div id="vVal" class="val" style="color:#00ffff">0</div>
-        </div>
-        <div class="box">
-            <div style="color:#ffff00; font-size: 12px;">🚀 PUSHER</div>
-            <input type="range" id="pSlider" min="0" max="100" value="0" orient="vertical">
-            <div id="pVal" class="val" style="color:#ffff00">0</div>
-        </div>
+    <div class="vibe-bar">
+        <div id="vibe-level"></div>
     </div>
 
-    <button class="btn-stop" onclick="stopRemote()">🛑 STOP ALL</button>
+    <div class="info" id="logText">SYSTEM READY</div>
 
-    <script>
-        let conn;
-        const peer = new Peer();
+    <div class="actions">
+        <button onclick="connectBT()">BT CONNECT</button>
+        <button onclick="startAudio()">MIC SYNC</button>
+    </div>
+</div>
 
-        function connectToHost() {
-            const id = document.getElementById('peer-id').value;
-            conn = peer.connect(id);
-            conn.on('open', () => {
-                document.getElementById('status').innerText = "✅ ЗВ'ЯЗОК Є!";
-                document.getElementById('status').style.color = "#0f0";
-            });
+<script src="remote.js"></script>
+
+<script>
+    // Хуки для оновлення дизайну
+    const originalLog = addLog;
+    addLog = (msg) => {
+        if(originalLog) originalLog(msg);
+        document.getElementById('logText').innerText = msg.toUpperCase();
+        if (msg.includes("З'єднано") || msg.includes("готовий")) {
+            document.getElementById('toy').classList.add('connected');
         }
+    };
 
-        // Відправка вібро (Long)
-        document.getElementById('vSlider').oninput = function() {
-            let v = parseInt(this.value);
-            let finalV = (v > 0 && v < 6) ? 6 : v;
-            document.getElementById('vVal').innerText = finalV;
-            if (conn && conn.open) conn.send({type: 'v', val: finalV});
-        };
+    // Цей код треба вставити в monitor() у твоєму remote.js:
+    /*
+    document.getElementById('vibe-level').style.height = (vol * 2.5) + "%";
+    document.getElementById('glow-effect').style.opacity = vol / 40;
+    */
+</script>
 
-        // Відправка толкачки (Short)
-        document.getElementById('pSlider').oninput = function() {
-            let v = parseInt(this.value);
-            let finalV = (v > 0 && v < 32) ? 32 : v;
-            document.getElementById('pVal').innerText = finalV;
-            if (conn && conn.open) conn.send({type: 'p', val: finalV});
-        };
-
-        // Функція повної зупинки
-        function stopRemote() {
-            document.getElementById('vSlider').value = 0;
-            document.getElementById('pSlider').value = 0;
-            document.getElementById('vVal').innerText = "0";
-            document.getElementById('pVal').innerText = "0";
-            
-            if (conn && conn.open) {
-                // Шлемо команди зупинки для обох типів пакетів
-                conn.send({type: 'v', val: 0});
-                setTimeout(() => {
-                    conn.send({type: 'p', val: 0});
-                }, 50);
-            }
-        }
-    </script>
 </body>
 </html>

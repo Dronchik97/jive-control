@@ -2,90 +2,72 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Jive Server | Custom ID</title>
+    <title>Jive Server | Poltava Final</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { background: #050505; color: #00ff41; font-family: monospace; text-align: center; padding: 20px; }
-        .box { border: 2px solid #00ff41; padding: 30px; border-radius: 20px; background: #111; display: inline-block; width: 340px; box-shadow: 0 0 20px #00ff41; }
+        .box { border: 2px solid #00ff41; padding: 25px; border-radius: 15px; background: #111; display: inline-block; width: 340px; box-shadow: 0 0 15px #00ff41; }
         input { background: #000; border: 1px solid #333; color: #00ff41; padding: 12px; width: 85%; margin: 15px 0; text-align: center; border-radius: 10px; font-size: 18px; outline: none; }
-        .btn-bt { background: #0088ff; color: #fff; border: none; padding: 15px; width: 100%; border-radius: 12px; font-weight: bold; cursor: pointer; margin-bottom: 10px; text-transform: uppercase; }
-        .btn-start { background: #00ff41; color: #000; border: none; padding: 15px; width: 100%; border-radius: 12px; font-weight: bold; cursor: pointer; text-transform: uppercase; }
-        #log { font-size: 11px; color: #666; text-align: left; margin-top: 20px; height: 100px; overflow-y: auto; border-top: 1px solid #222; padding-top: 10px; }
-        .stat-dot { height: 10px; width: 10px; background-color: red; border-radius: 50%; display: inline-block; margin-right: 5px; }
+        button { background: #0088ff; color: #fff; border: none; padding: 15px; width: 100%; border-radius: 10px; font-weight: bold; cursor: pointer; text-transform: uppercase; margin-bottom: 10px; }
+        #log { font-size: 11px; color: #666; text-align: left; height: 120px; overflow-y: auto; border-top: 1px solid #222; margin-top: 15px; padding-top: 10px; }
     </style>
 </head>
 <body>
-
-<div class="box">
-    <h2 style="letter-spacing: 2px;">📡 SERVER UNIT</h2>
-    
-    <button class="btn-bt" onclick="connectBT()">🔗 1. ПІДКЛЮЧИТИ ЗАЛІЗО</button>
-    <div style="font-size: 12px; margin-bottom: 20px;"><span id="btDot" class="stat-dot"></span> BT STATUS: <span id="btText">OFF</span></div>
-
-    <hr style="border: 0.5px solid #222;">
-
-    <div style="margin-top: 10px;">ВВЕДИ СВІЙ ID:</div>
-    <input type="text" id="customId" placeholder="Наприклад: andrii777">
-    <button class="btn-start" onclick="startServer()">🚀 2. ЗАПУСТИТИ СТРИМ</button>
-    
-    <div id="log"></div>
-</div>
-
-<script>
-    let toyChar, peer;
-
-    function addLog(m) {
-        const log = document.getElementById('log');
-        log.innerHTML += `> ${m}<br>`;
-        log.scrollTop = log.scrollHeight;
-    }
-
-    async function connectBT() {
-        try {
-            const device = await navigator.bluetooth.requestDevice({
-                acceptAllDevices: true,
-                optionalServices: ['0000fee9-0000-1000-8000-00805f9b34fb']
-            });
-            const server = await device.gatt.connect();
-            const services = await server.getPrimaryServices();
-            for (let s of services) {
-                const chars = await s.getCharacteristics();
-                toyChar = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
-                if (toyChar) break;
-            }
-            if (toyChar) {
-                document.getElementById('btDot').style.backgroundColor = "#00ff41";
-                document.getElementById('btText').innerText = "ONLINE (" + device.name + ")";
-                addLog("Іграшка готова.");
-            }
-        } catch (e) { addLog("BT Error: " + e.message); }
-    }
-
-    function startServer() {
-        const myId = document.getElementById('customId').value;
-        if(!myId) return alert("Впиши ID!");
-
-        peer = new Peer(myId); // Створюємо сервер з ТВОЇМ ID
+    <div class="box">
+        <h3>🛰️ SERVER ADM</h3>
+        <button onclick="connectBT()">🔗 1. ПІДКЛЮЧИТИ CBT001</button>
+        <div id="btStat" style="color:red; font-size:12px; margin-bottom:15px;">BT: OFF</div>
         
-        peer.on('open', (id) => {
-            addLog("СЕРВЕР ЗАПУЩЕНО! Твій ID: " + id);
-            document.getElementById('customId').disabled = true;
-        });
+        <hr style="border:0.5px solid #222;">
+        <input type="text" id="customId" placeholder="ТВІЙ ID">
+        <button style="background:#00ff41; color:#000;" onclick="startServer()">🚀 2. ЗАПУСТИТИ МЕРЕЖУ</button>
+        
+        <div id="log"></div>
+    </div>
 
-        peer.on('connection', (conn) => {
-            addLog("ПУЛЬТ ПІДКЛЮЧИВСЯ!");
-            conn.on('data', (data) => {
-                if (toyChar) {
-                    toyChar.writeValueWithoutResponse(new Uint8Array([0xFF, data.m1, data.m2]));
+    <script>
+        let toyChar, peer;
+        const addLog = (m) => { document.getElementById('log').innerHTML += `> ${m}<br>`; };
+
+        async function connectBT() {
+            try {
+                const device = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: ['0000fee9-0000-1000-8000-00805f9b34fb']
+                });
+                const server = await device.gatt.connect();
+                const services = await server.getPrimaryServices();
+                for (let s of services) {
+                    const chars = await s.getCharacteristics();
+                    toyChar = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
+                    if (toyChar) break;
                 }
-            });
-        });
+                if (toyChar) {
+                    document.getElementById('btStat').innerText = "✅ ПІДКЛЮЧЕНО";
+                    document.getElementById('btStat').style.color = "#00ff41";
+                    addLog("Зв'язок з іграшкою є.");
+                }
+            } catch (e) { addLog("BT Error: " + e.message); }
+        }
 
-        peer.on('error', (err) => {
-            addLog("Помилка: " + err.type);
-            if(err.type === 'unavailable-id') alert("Цей ID вже зайнятий, придумай інший!");
-        });
-    }
-</script>
+        function startServer() {
+            const myId = document.getElementById('customId').value;
+            if(!myId) return alert("Впиши ID!");
+            peer = new Peer(myId);
+            peer.on('open', (id) => { addLog("ID активний: " + id); });
+            peer.on('connection', (conn) => {
+                addLog("Пульт зайшов.");
+                conn.on('data', (data) => {
+                    if (toyChar) {
+                        // ТА САМА ПАЧКА БАЙТІВ, ЯКА ПРАЦЮВАЛА
+                        // Ми ж тоді вияснили, шо треба слати саме так!
+                        const cmd = new Uint8Array([0x01, 0x01, data.m1, 0x01, 0x02, data.m2]);
+                        toyChar.writeValueWithoutResponse(cmd);
+                        addLog(`M1: ${data.m1}, M2: ${data.m2}`);
+                    }
+                });
+            });
+        }
+    </script>
 </body>
 </html>

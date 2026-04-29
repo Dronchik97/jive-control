@@ -3,39 +3,42 @@
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
-        body { background: #000; color: #0f0; font-family: monospace; text-align: center; padding: 10px; }
-        .group { border: 2px solid #333; margin: 10px 0; padding: 15px; border-radius: 10px; }
-        input[type=range] { width: 90%; height: 50px; cursor: pointer; accent-color: #0f0; }
-        button { background: #111; color: #0f0; border: 1px solid #0f0; padding: 15px; width: 100%; max-width: 310px; cursor: pointer; margin-top: 10px; }
-        .label { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
-        .pusher { color: #ffff00; }
-        .vibro { color: #00ffff; }
-        #status { font-size: 12px; color: #666; margin: 10px; }
+        body { background: #000; color: #0f0; font-family: 'Courier New', monospace; text-align: center; padding: 10px; }
+        .group { border: 2px solid #333; margin: 15px 0; padding: 15px; border-radius: 12px; background: #050505; }
+        input[type=range] { width: 95%; height: 50px; cursor: pointer; accent-color: #0f0; margin: 15px 0; }
+        button { background: #111; color: #0f0; border: 2px solid #0f0; padding: 20px; width: 100%; max-width: 320px; cursor: pointer; font-size: 18px; font-weight: bold; border-radius: 8px; }
+        button:active { background: #0f0; color: #000; }
+        .label { font-size: 18px; text-transform: uppercase; margin-bottom: 5px; }
+        .val { font-size: 22px; color: #fff; text-shadow: 0 0 5px #0f0; }
+        .status { font-size: 12px; color: #666; margin: 10px; }
+        .pusher-color { color: #ffff00; border-color: #ffff00; }
+        .vibro-color { color: #00ffff; border-color: #00ffff; }
     </style>
 </head>
 <body>
-    <h3>DOUBLE CONTROL: PUSHER & VIBRO</h3>
+    <h3>ANDRII "LONG-PACKET" CONTROL</h3>
     
     <button onclick="conn()">🔌 ПІДКЛЮЧИТИСЬ</button>
-    <div id="status">Статус: Очікування</div>
+    <div id="status" class="status">Статус: Очікування...</div>
 
-    <div class="group" style="border-color: #ffff00;">
-        <p class="label pusher">🚀 ТОЛКАЧКА (Short)</p>
+    <div class="group pusher-color">
+        <p class="label">🚀 ТОЛКАЧКА (08)</p>
         <input type="range" id="pSlider" min="0" max="100" value="0">
-        <div id="pVal">Потужність: 0%</div>
+        <div id="pDisp" class="val">OFF</div>
+        <div style="font-size: 10px; color: #555;">(Робочий хід: 32-100)</div>
     </div>
 
-    <div class="group" style="border-color: #00ffff;">
-        <p class="label vibro">📳 ВІБРАЦІЯ (Long)</p>
+    <div class="group vibro-color">
+        <p class="label">📳 ВІБРАЦІЯ (0A)</p>
         <input type="range" id="vSlider" min="0" max="100" value="0">
-        <div id="vVal">Потужність: 0%</div>
+        <div id="vDisp" class="val">OFF</div>
     </div>
 
-    <button onclick="stopAll()" style="color:red; border-color:red;">🛑 STOP ALL</button>
+    <button onclick="stopAll()" style="color:#ff4444; border-color:#ff4444; margin-top: 20px;">🛑 ВСЕ ВИМКНУТИ</button>
 
     <script>
         let ch;
-        let lastP = 0, lastV = 0;
+        let lastTime = 0;
 
         async function conn() {
             try {
@@ -47,41 +50,59 @@
                 const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
                 ch = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
                 document.getElementById('status').innerText = "✅ ПІДКЛЮЧЕНО: " + d.name;
-            } catch (e) { alert("Error: " + e.message); }
+            } catch (e) { document.getElementById('status').innerText = "❌ ПОМИЛКА: " + e.message; }
         }
 
-        // Обробка Толкачки (Короткий пакет 3 байти)
-        document.getElementById('pSlider').oninput = async function() {
+        // Універсальна функція для надсилання "королівського" пакета на 22 байти
+        async function sendFullStack(channel, speed) {
+            if (!ch || Date.now() - lastTime < 70) return;
+            lastTime = Date.now();
+
+            let s = parseInt(speed);
+            
+            // Формуємо пачку як у твоїх логах: 15ff + 4 блоки по 5 байт
+            // Ми дублюємо команду для надійності, як це робить оригінальний додаток
+            let data = new Uint8Array([
+                0x15, 0xFF,
+                0x04, channel, s, s, 0x00, // Пакет 1
+                0x04, channel, s, s, 0x01, // Пакет 2 (дубль з індексом 1)
+                0x04, channel, s, s, 0x00, // Пакет 3 (ще дубль)
+                0x04, channel, s, s, 0x01  // Пакет 4 (фінальний)
+            ]);
+
+            try {
+                await ch.writeValueWithoutResponse(data);
+            } catch (e) { console.log("Bluetooth Busy..."); }
+        }
+
+        // Логіка Толкачки
+        document.getElementById('pSlider').oninput = function() {
             let val = parseInt(this.value);
-            document.getElementById('pVal').innerText = "Потужність: " + val + "%";
-            if (ch && Date.now() - lastP > 50) {
-                lastP = Date.now();
-                await ch.writeValueWithoutResponse(new Uint8Array([11, 8, val]));
-            }
+            // 0x20 (32) - це мінімум, який ти казав. Менше - не потягне.
+            let finalVal = (val === 0) ? 0 : (val < 32 ? 32 : val);
+            document.getElementById('pDisp').innerText = finalVal === 0 ? "OFF" : finalVal + " (0x" + finalVal.toString(16).toUpperCase() + ")";
+            sendFullStack(0x08, finalVal);
         };
 
-        // Обробка Вібро (Довгий пакет 7 байтів)
-        document.getElementById('vSlider').oninput = async function() {
+        // Логіка Вібро
+        document.getElementById('vSlider').oninput = function() {
             let val = parseInt(this.value);
-            document.getElementById('vVal').innerText = "Потужність: " + val + "%";
-            if (ch && Date.now() - lastV > 50) {
-                lastV = Date.now();
-                // Твій новий формат: 15 ff 04 08 [val] 64 00
-                let data = new Uint8Array([0x15, 0xFF, 0x04, 0x08, val, 0x64, 0x00]);
-                await ch.writeValueWithoutResponse(data);
-            }
+            document.getElementById('vDisp').innerText = val === 0 ? "OFF" : val + "%";
+            sendFullStack(0x0A, val);
         };
 
         async function stopAll() {
             if (!ch) return;
-            // Шлемо стоп на обидва протоколи
-            await ch.writeValueWithoutResponse(new Uint8Array([11, 8, 0]));
-            setTimeout(async () => {
-                await ch.writeValueWithoutResponse(new Uint8Array([0x15, 0xFF, 0x04, 0x08, 0x00, 0x64, 0x00]));
-            }, 100);
+            // Шлемо нулі на обидва канали довгими пакетами
+            let stopP = new Uint8Array([0x15, 0xFF, 0x04, 0x08, 0, 0, 0, 0x04, 0x08, 0, 0, 1, 0x04, 0x08, 0, 0, 0, 0x04, 0x08, 0, 0, 1]);
+            let stopV = new Uint8Array([0x15, 0xFF, 0x04, 0x0A, 0, 0, 0, 0x04, 0x0A, 0, 0, 1, 0x04, 0x0A, 0, 0, 0, 0x04, 0x0A, 0, 0, 1]);
+            
+            await ch.writeValueWithoutResponse(stopP);
+            setTimeout(async () => { await ch.writeValueWithoutResponse(stopV); }, 100);
+            
             document.querySelectorAll('input').forEach(i => i.value = 0);
-            document.getElementById('pVal').innerText = "Потужність: 0%";
-            document.getElementById('vVal').innerText = "Потужність: 0%";
+            document.getElementById('pDisp').innerText = "OFF";
+            document.getElementById('vDisp').innerText = "OFF";
         }
     </script>
 </body>

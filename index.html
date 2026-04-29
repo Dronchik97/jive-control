@@ -2,50 +2,36 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Jive-Control V2.0 (Audio Sync)</title>
+    <title>Jive-Control (Pult Mode)</title>
     <style>
-        body { background: #0b0e14; color: #00ff41; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 20px; }
-        .container { border: 2px solid #00ff41; padding: 30px; border-radius: 20px; display: inline-block; background: #161b22; box-shadow: 0 0 20px rgba(0, 255, 65, 0.2); max-width: 400px; width: 90%; }
-        h1 { font-size: 24px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px; }
-        .status-box { margin: 15px 0; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 14px; border: 1px solid #333; }
-        .online { background: #004411; border-color: #00ff41; color: #00ff41; }
-        .offline { background: #440000; border-color: #ff4141; color: #ff4141; }
-        
-        button { background: #00ff41; color: #000; border: none; padding: 15px 25px; border-radius: 10px; font-weight: bold; cursor: pointer; margin: 10px 0; width: 100%; font-size: 16px; transition: 0.3s; }
-        button:hover { background: #00cc33; transform: scale(1.02); }
-        button:active { transform: scale(0.98); }
-
-        #meter { width: 100%; height: 30px; background: #000; border: 1px solid #00ff41; border-radius: 5px; overflow: hidden; margin: 20px 0; position: relative; }
-        #fill { height: 100%; width: 0%; background: linear-gradient(90deg, #00ff41, #adff2f); transition: width 0.05s ease; }
-        .vol-label { position: absolute; width: 100%; top: 5px; left: 0; color: #fff; font-size: 14px; text-shadow: 1px 1px 2px #000; }
-        
-        .log { font-size: 12px; color: #888; text-align: left; height: 60px; overflow-y: auto; background: #000; padding: 5px; border-radius: 5px; }
+        body { background: #000; color: #00ff41; font-family: 'Courier New', monospace; text-align: center; padding: 20px; }
+        .pult { border: 3px solid #00ff41; padding: 25px; border-radius: 20px; display: inline-block; background: #111; box-shadow: 0 0 15px #00ff41; }
+        #btStatus { margin: 10px; padding: 10px; border: 1px solid #333; border-radius: 5px; font-weight: bold; }
+        .online { color: #00ff41; border-color: #00ff41; }
+        .offline { color: #ff0000; border-color: #ff0000; }
+        button { background: #00ff41; color: #000; border: none; padding: 15px 25px; border-radius: 10px; font-weight: bold; cursor: pointer; margin: 10px 0; width: 100%; }
+        #meter { width: 100%; height: 30px; background: #222; border: 1px solid #00ff41; margin: 20px 0; border-radius: 5px; overflow: hidden; }
+        #fill { height: 100%; width: 0%; background: #00ff41; transition: width 0.05s; }
+        .log { font-size: 11px; color: #666; text-align: left; height: 60px; overflow-y: auto; background: #050505; padding: 5px; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <h1>🦾 JIVE-CONTROL</h1>
-    <p style="color: #888; font-size: 14px;">Система синхронізації з донатами</p>
-
-    <div id="btStatus" class="status-box offline">BLUETOOTH: НЕ ПІДКЛЮЧЕНО</div>
-    <button onclick="connectBT()">🔌 1. ПІДКЛЮЧИТИ ІГРАШКУ</button>
-
-    <div id="audioStatus" class="status-box offline">ЗВУК: НЕ АКТИВНО</div>
-    <button onclick="startAudio()">🎤 2. СЛУХАТИ ДОНАТИ (МІК)</button>
-
-    <div id="meter">
-        <div id="fill"></div>
-        <div class="vol-label">Рівень сигналу</div>
-    </div>
-
-    <div class="log" id="logBox">Система готова до запуску...</div>
+<div class="pult">
+    <h1>🦾 JIVE-PULT V5</h1>
+    <div id="btStatus" class="offline">СТАТУС: ВІДКЛЮЧЕНО</div>
+    
+    <button onclick="connectBT()">🔌 1. ЗАКОНЕКТИТИ ПУЛЬТ</button>
+    <button onclick="startAudio()">🎤 2. СИНХРОНІЗАЦІЯ ЗІ ЗВУКОМ</button>
+    
+    <div id="meter"><div id="fill"></div></div>
+    <div class="log" id="logBox">Чекаю на прозвонку...</div>
 </div>
 
 <script>
-    let toyCharacteristic;
+    let toyChar;
     let audioCtx, analyser, dataArr;
-    let lastSentSpeed = 0;
+    let lastSpd = -1;
 
     function addLog(msg) {
         const box = document.getElementById('logBox');
@@ -55,89 +41,79 @@
 
     async function connectBT() {
         try {
-            addLog("Шукаю пристрої...");
+            addLog("Шукаю твою залізяку...");
             const device = await navigator.bluetooth.requestDevice({
                 acceptAllDevices: true,
-                optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
+                optionalServices: [
+                    '0000fee9-0000-1000-8000-00805f9b34fb', // Твій стандартний сервіс
+                    '78667579-7b48-43db-b8c5-7928a6b0a335'
+                ]
             });
-            
-            addLog("Підключаюсь до " + device.name);
             const server = await device.gatt.connect();
-            const service = await server.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
-            toyCharacteristic = await service.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
+            addLog("З'єднано з: " + device.name);
+
+            const services = await server.getPrimaryServices();
+            let service = services[0];
+            const characteristics = await service.getCharacteristics();
+            // Шукаємо характеристику для запису
+            toyChar = characteristics.find(c => c.properties.write || c.properties.writeWithoutResponse);
             
-            document.getElementById('btStatus').innerText = "BLUETOOTH: КОНТАКТ Є!";
-            document.getElementById('btStatus').className = "status-box online";
-            addLog("Bluetooth готовий!");
+            if (toyChar) {
+                document.getElementById('btStatus').innerText = "СТАТУС: ПІДКЛЮЧЕНО ✅";
+                document.getElementById('btStatus').className = "offline online";
+                addLog("Канал зв'язку готовий!");
+            }
         } catch (err) {
-            addLog("Помилка BT: " + err);
+            addLog("Помилка: " + err);
         }
     }
 
     async function startAudio() {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const source = audioCtx.createMediaStreamSource(stream);
-            analyser = audioCtx.createAnalyser();
-            analyser.fftSize = 256;
-            source.connect(analyser);
-            
-            dataArr = new Uint8Array(analyser.frequencyBinCount);
-            
-            document.getElementById('audioStatus').innerText = "ЗВУК: СЛУХАЮ...";
-            document.getElementById('audioStatus').className = "status-box online";
-            addLog("Мікрофон активний!");
-            
-            monitor();
-        } catch (err) {
-            addLog("Помилка аудіо: " + err);
-            alert("Потрібен доступ до мікрофона!");
-        }
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioCtx = new AudioContext();
+        const source = audioCtx.createMediaStreamSource(stream);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        dataArr = new Uint8Array(analyser.frequencyBinCount);
+        addLog("Мікрофон слухає ефір...");
+        monitor();
     }
 
     function monitor() {
         analyser.getByteFrequencyData(dataArr);
         let sum = 0;
-        for (let i = 0; i < dataArr.length; i++) {
-            sum += dataArr[i];
-        }
-        let volume = Math.round(sum / dataArr.length);
+        for (let i = 0; i < dataArr.length; i++) sum += dataArr[i];
+        let vol = Math.round(sum / dataArr.length);
         
-        // Візуалізація
-        document.getElementById('fill').style.width = Math.min(volume * 2, 100) + "%";
+        document.getElementById('fill').style.width = Math.min(vol * 3, 100) + "%";
         
-        // Логіка керування (поріг 15, щоб була вища чутливість)
-        if (volume > 15) {
-            // Переводимо гучність у швидкість 0-20
-            let speed = Math.min(Math.round(volume / 3), 20);
-            
-            if (speed !== lastSentSpeed) {
-                sendToToy(speed);
-                lastSentSpeed = speed;
+        if (vol > 20) {
+            // Швидкість зазвичай 0-255 для таких плат
+            let speed = Math.min(vol * 4, 255); 
+            if (Math.abs(speed - lastSpd) > 5) {
+                sendPultCommand(speed);
+                lastSpd = speed;
             }
-        } else {
-            if (lastSentSpeed !== 0) {
-                sendToToy(0);
-                lastSentSpeed = 0;
-            }
+        } else if (lastSpd !== 0) {
+            sendPultCommand(0);
+            lastSpd = 0;
         }
-        
         requestAnimationFrame(monitor);
     }
 
-    async function sendToToy(speed) {
-        if (toyCharacteristic) {
-            try {
-                // Команда Lovense: [0x00, 0x08, швидкість]
-                let data = new Uint8Array([0x00, 0x08, speed]);
-                await toyCharacteristic.writeValueWithoutResponse(data);
-            } catch (e) {
-                console.log("Збій відправки");
-            }
+    async function sendPultCommand(s) {
+        if (!toyChar) return;
+        try {
+            // ТІ САМІ БАЙТИ, ШО МИ ПИСАЛИ ДЛЯ ПУЛЬТА:
+            // Часто це [0x55, 0x01, швидкість] або [0xFF, швидкість]
+            // Шлемо комбінацію, яка працювала в нас у пульті:
+            let data = new Uint8Array([0x55, 0x01, s]); 
+            await toyChar.writeValueWithoutResponse(data);
+        } catch (e) {
+            console.log("Error");
         }
     }
 </script>
-
 </body>
 </html>

@@ -4,48 +4,38 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { background: #000; color: #0f0; font-family: monospace; text-align: center; padding: 10px; }
-        .group { border: 2px solid #333; margin: 15px 0; padding: 15px; border-radius: 10px; position: relative; }
-        
-        /* Повзунок з градієнтом: блакитний для вібро, жовтий для толкачки */
-        input[type=range] { 
-            width: 95%; height: 60px; cursor: pointer;
-            background: linear-gradient(to right, #00ffff 0%, #00ffff 24%, #ffff00 25%, #ffff00 100%);
-            border-radius: 10px; appearance: none; outline: none;
-        }
-        input[type=range]::-webkit-slider-thumb {
-            appearance: none; width: 40px; height: 70px; background: #fff; border: 3px solid #0f0; border-radius: 5px;
-        }
-
-        .label { font-size: 20px; font-weight: bold; margin-top: 15px; }
-        .info { font-size: 12px; color: #666; margin-top: 5px; }
-        button { background: #111; color: #0f0; border: 1px solid #0f0; padding: 20px; width: 100%; max-width: 310px; cursor: pointer; margin-top: 20px; font-size: 18px; }
-        
-        .zone-vibro { color: #00ffff; }
-        .zone-pusher { color: #ffff00; }
+        .group { border: 2px solid #333; margin: 10px 0; padding: 15px; border-radius: 10px; }
+        input[type=range] { width: 90%; height: 50px; cursor: pointer; accent-color: #0f0; }
+        button { background: #111; color: #0f0; border: 1px solid #0f0; padding: 15px; width: 100%; max-width: 310px; cursor: pointer; margin-top: 10px; }
+        .label { font-size: 18px; font-weight: bold; margin-bottom: 10px; }
+        .pusher { color: #ffff00; }
+        .vibro { color: #00ffff; }
+        #status { font-size: 12px; color: #666; margin: 10px; }
     </style>
 </head>
 <body>
-    <h3>ANDRII HYBRID CONTROL (7-BYTE)</h3>
+    <h3>DOUBLE CONTROL: PUSHER & VIBRO</h3>
     
-    <button onclick="conn()">🔌 CONNECT DEVICE</button>
-    
-    <div class="group">
-        <p id="modeText" class="label">РЕЖИМ: ОЧІКУВАННЯ</p>
-        
-        <input type="range" id="hybridSlider" min="0" max="100" value="0">
-        
-        <div id="valDisplay" class="label">Значення: 0x00</div>
-        <div class="info">01-0F: Вібро | 10-64: Толкачка</div>
+    <button onclick="conn()">🔌 ПІДКЛЮЧИТИСЬ</button>
+    <div id="status">Статус: Очікування</div>
+
+    <div class="group" style="border-color: #ffff00;">
+        <p class="label pusher">🚀 ТОЛКАЧКА (Short)</p>
+        <input type="range" id="pSlider" min="0" max="100" value="0">
+        <div id="pVal">Потужність: 0%</div>
+    </div>
+
+    <div class="group" style="border-color: #00ffff;">
+        <p class="label vibro">📳 ВІБРАЦІЯ (Long)</p>
+        <input type="range" id="vSlider" min="0" max="100" value="0">
+        <div id="vVal">Потужність: 0%</div>
     </div>
 
     <button onclick="stopAll()" style="color:red; border-color:red;">🛑 STOP ALL</button>
 
     <script>
         let ch;
-        let lastTime = 0;
-        const slider = document.getElementById('hybridSlider');
-        const modeText = document.getElementById('modeText');
-        const valDisplay = document.getElementById('valDisplay');
+        let lastP = 0, lastV = 0;
 
         async function conn() {
             try {
@@ -56,44 +46,42 @@
                 const s = await d.gatt.connect();
                 const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
                 ch = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-                modeText.innerText = "✅ ПІДКЛЮЧЕНО";
-            } catch (e) { alert("Помилка: " + e.message); }
+                document.getElementById('status').innerText = "✅ ПІДКЛЮЧЕНО: " + d.name;
+            } catch (e) { alert("Error: " + e.message); }
         }
 
-        slider.oninput = async function() {
+        // Обробка Толкачки (Короткий пакет 3 байти)
+        document.getElementById('pSlider').oninput = async function() {
             let val = parseInt(this.value);
-            let hexStr = val.toString(16).toUpperCase().padStart(2, '0');
-            valDisplay.innerText = "Значення: 0x" + hexStr;
-
-            // Логіка підписів
-            if (val === 0) {
-                modeText.innerText = "СТОП";
-                modeText.className = "label";
-            } else if (val <= 15) {
-                modeText.innerText = "📳 ВІБРАЦІЯ";
-                modeText.className = "label zone-vibro";
-            } else {
-                modeText.innerText = "🚀 ТОЛКАЧКА";
-                modeText.className = "label zone-pusher";
+            document.getElementById('pVal').innerText = "Потужність: " + val + "%";
+            if (ch && Date.now() - lastP > 50) {
+                lastP = Date.now();
+                await ch.writeValueWithoutResponse(new Uint8Array([11, 8, val]));
             }
+        };
 
-            // Відправка пакета 15 ff 04 08 [val] 64 00
-            if (ch && Date.now() - lastTime > 60) {
-                lastTime = Date.now();
-                try {
-                    let data = new Uint8Array([0x15, 0xFF, 0x04, 0x08, val, 0x64, 0x00]);
-                    await ch.writeValueWithoutResponse(data);
-                } catch (e) { console.log("Пропуск..."); }
+        // Обробка Вібро (Довгий пакет 7 байтів)
+        document.getElementById('vSlider').oninput = async function() {
+            let val = parseInt(this.value);
+            document.getElementById('vVal').innerText = "Потужність: " + val + "%";
+            if (ch && Date.now() - lastV > 50) {
+                lastV = Date.now();
+                // Твій новий формат: 15 ff 04 08 [val] 64 00
+                let data = new Uint8Array([0x15, 0xFF, 0x04, 0x08, val, 0x64, 0x00]);
+                await ch.writeValueWithoutResponse(data);
             }
         };
 
         async function stopAll() {
-            if (ch) {
+            if (!ch) return;
+            // Шлемо стоп на обидва протоколи
+            await ch.writeValueWithoutResponse(new Uint8Array([11, 8, 0]));
+            setTimeout(async () => {
                 await ch.writeValueWithoutResponse(new Uint8Array([0x15, 0xFF, 0x04, 0x08, 0x00, 0x64, 0x00]));
-            }
-            slider.value = 0;
-            modeText.innerText = "СТОП";
-            valDisplay.innerText = "Значення: 0x00";
+            }, 100);
+            document.querySelectorAll('input').forEach(i => i.value = 0);
+            document.getElementById('pVal').innerText = "Потужність: 0%";
+            document.getElementById('vVal').innerText = "Потужність: 0%";
         }
     </script>
 </body>

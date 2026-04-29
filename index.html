@@ -37,7 +37,7 @@
         }
 
         // PeerJS (Інтернет)
-        const peer = new Peer(); 
+        const peer = new Peer('12345678'); 
         peer.on('open', (id) => { document.getElementById('my-id').innerText = id; });
 
         peer.on('connection', (conn) => {

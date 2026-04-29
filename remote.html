@@ -2,104 +2,90 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Jive Remote - Client View</title>
+    <title>Jive Remote - Manual Mode</title>
     <style>
-        :root { --neon: #00ff41; --black: #0a0a0b; }
-        body { background: transparent; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; font-family: 'Segoe UI', sans-serif; overflow: hidden; }
-
-        /* КОРПУС ПУЛЬТА */
-        .remote-case {
-            width: 240px; height: 480px;
-            background: linear-gradient(145deg, #1a1a1c, #020202);
-            border-radius: 55px; border: 2px solid #222;
-            box-shadow: 0 40px 80px rgba(0,0,0,0.9), inset 0 0 15px rgba(255,255,255,0.05);
-            display: flex; flex-direction: column; align-items: center;
-            padding: 30px 15px; position: relative;
-        }
-
-        /* Назва іграшки */
-        .logo { font-size: 9px; letter-spacing: 5px; color: #444; margin-bottom: 30px; text-transform: uppercase; }
-
-        /* СВІТЛОВЕ КОЛО (Реагує на вібрацію) */
-        .led-circle {
-            width: 90px; height: 90px; border-radius: 50%;
-            background: #111; border: 3px solid #1a1a1a;
-            display: flex; justify-content: center; align-items: center;
-            margin-bottom: 40px; position: relative; box-shadow: inset 0 0 10px #000;
-        }
-
-        #glow-effect {
-            position: absolute; width: 100%; height: 100%; border-radius: 50%;
-            background: var(--neon); filter: blur(15px); opacity: 0; transition: opacity 0.1s;
-        }
-
-        .status-led { width: 10px; height: 10px; background: #222; border-radius: 50%; z-index: 2; transition: 0.3s; }
-        .connected .status-led { background: var(--neon); box-shadow: 0 0 15px var(--neon); }
-
-        /* ВЕРТИКАЛЬНА ШКАЛА */
-        .vibe-bar {
-            width: 6px; height: 140px; background: #000;
-            border-radius: 10px; position: relative; border: 1px solid #1a1a1a; margin-bottom: 30px;
-        }
-
-        #vibe-level {
-            width: 100%; height: 0%; background: var(--neon);
-            position: absolute; bottom: 0; border-radius: 10px;
-            box-shadow: 0 0 15px var(--neon); transition: height 0.1s;
-        }
-
-        /* ТЕХНІЧНА ІНФА */
-        .info { font-size: 10px; color: #333; font-family: monospace; }
-
-        /* ПРИХОВАНІ КНОПКИ (тільки для тебе, клієнт їх не бачить якщо підкрутиш стилі) */
-        .actions { margin-top: 20px; width: 100%; }
-        button { 
-            width: 100%; background: rgba(255,255,255,0.03); border: 1px solid #222; 
-            color: #444; padding: 10px; border-radius: 10px; cursor: pointer; font-size: 10px;
-        }
-        button:hover { color: var(--neon); border-color: var(--neon); }
+        /* Весь той самий дизайн пульта, шо ми робили раніше */
+        :root { --neon: #00ff41; }
+        body { background: #000; color: #fff; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; font-family: sans-serif; }
+        .remote-case { width: 240px; height: 480px; background: #111; border: 2px solid #222; border-radius: 55px; padding: 30px; text-align: center; position: relative; }
+        #vibe-level { width: 10px; background: var(--neon); position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); transition: 0.1s; box-shadow: 0 0 15px var(--neon); }
+        .bar-bg { width: 10px; height: 150px; background: #000; margin: 20px auto; position: relative; border-radius: 5px; }
+        #statusInfo { font-size: 11px; color: #444; margin-top: 10px; }
     </style>
 </head>
 <body>
 
-<div class="remote-case" id="toy">
-    <div class="logo">REMOTE UNIT</div>
-
-    <div class="led-circle">
-        <div id="glow-effect"></div>
-        <div class="status-led"></div>
+<div class="remote-case">
+    <div style="font-size: 10px; color: #666; margin-bottom: 20px;">TARGET ID: <br><span id="targetId" style="color:#00ff41">???</span></div>
+    
+    <div class="bar-bg">
+        <div id="vibe-level" style="height: 0%;"></div>
     </div>
 
-    <div class="vibe-bar">
-        <div id="vibe-level"></div>
-    </div>
-
-    <div class="info" id="logText">SYSTEM READY</div>
-
-    <div class="actions">
-        <button onclick="connectBT()">BT CONNECT</button>
-        <button onclick="startAudio()">MIC SYNC</button>
-    </div>
+    <button onclick="linkToId()" style="background:#00ff41; color:#000; border:none; padding:15px; width:100%; border-radius:12px; font-weight:bold; cursor:pointer;">ПІДКЛЮЧИТИСЯ</button>
+    
+    <div id="statusInfo">Очікування...</div>
 </div>
 
-<script src="remote.js"></script>
-
 <script>
-    // Хуки для оновлення дизайну
-    const originalLog = addLog;
-    addLog = (msg) => {
-        if(originalLog) originalLog(msg);
-        document.getElementById('logText').innerText = msg.toUpperCase();
-        if (msg.includes("З'єднано") || msg.includes("готовий")) {
-            document.getElementById('toy').classList.add('connected');
-        }
-    };
+    let toyChar;
+    let audioCtx, analyser, dataArr;
+    
+    // Беремо твій ID з пам'яті
+    const myCustomId = localStorage.getItem('lastDeviceId');
+    document.getElementById('targetId').innerText = myCustomId || "Не задано";
 
-    // Цей код треба вставити в monitor() у твоєму remote.js:
-    /*
-    document.getElementById('vibe-level').style.height = (vol * 2.5) + "%";
-    document.getElementById('glow-effect').style.opacity = vol / 40;
-    */
+    async function linkToId() {
+        try {
+            document.getElementById('statusInfo').innerText = "Шукаю твій ID...";
+            
+            // Браузер все одно спитає підтвердження, але ми фільтруємо по твому ID
+            const device = await navigator.bluetooth.requestDevice({
+                filters: [{ id: myCustomId }],
+                optionalServices: ['0000fee9-0000-1000-8000-00805f9b34fb']
+            });
+
+            const server = await device.gatt.connect();
+            const service = await server.getPrimaryService('0000fee9-0000-1000-8000-00805f9b34fb');
+            const chars = await service.getCharacteristics();
+            toyChar = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
+
+            if (toyChar) {
+                document.getElementById('statusInfo').innerText = "ЗВ'ЯЗОК Є!";
+                startAudio();
+            }
+        } catch (e) {
+            document.getElementById('statusInfo').innerText = "Помилка: " + e;
+        }
+    }
+
+    async function startAudio() {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioCtx = new AudioContext();
+        const source = audioCtx.createMediaStreamSource(stream);
+        analyser = audioCtx.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        dataArr = new Uint8Array(analyser.frequencyBinCount);
+        monitor();
+    }
+
+    function monitor() {
+        analyser.getByteFrequencyData(dataArr);
+        let sum = 0;
+        for (let i = 0; i < dataArr.length; i++) sum += dataArr[i];
+        let vol = Math.round(sum / dataArr.length);
+
+        document.getElementById('vibe-level').style.height = Math.min(vol * 2.5, 100) + "%";
+
+        if (vol > 15 && toyChar) {
+            let speed = Math.min(vol * 5, 255);
+            toyChar.writeValueWithoutResponse(new Uint8Array([0xFF, speed]));
+        } else if (toyChar) {
+            toyChar.writeValueWithoutResponse(new Uint8Array([0xFF, 0]));
+        }
+        requestAnimationFrame(monitor);
+    }
 </script>
 
 </body>

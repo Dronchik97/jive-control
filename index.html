@@ -2,74 +2,72 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Jive Server | Poltava Fix</title>
+    <title>SERVER ADM UNIT | Byte Perfect</title>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <style>
         body { background: #050505; color: #00ff41; font-family: monospace; text-align: center; padding: 20px; }
-        .box { border: 2px solid #00ff41; padding: 25px; border-radius: 15px; background: #111; display: inline-block; width: 340px; box-shadow: 0 0 20px #00ff41; }
-        input { background: #000; border: 1px solid #333; color: #00ff41; padding: 12px; width: 85%; margin: 15px 0; text-align: center; border-radius: 10px; font-size: 18px; outline: none; }
-        button { background: #0088ff; color: #fff; border: none; padding: 15px; width: 100%; border-radius: 12px; font-weight: bold; cursor: pointer; text-transform: uppercase; margin-bottom: 10px; }
-        #log { font-size: 11px; color: #666; text-align: left; height: 130px; overflow-y: auto; border-top: 1px solid #222; margin-top: 15px; padding-top: 10px; }
+        .box { border: 2px solid #00ff41; padding: 25px; border-radius: 20px; background: #111; display: inline-block; width: 360px; box-shadow: 0 0 20px #00ff41; }
+        input { background: #000; border: 1px solid #333; color: #00ff41; padding: 15px; width: 80%; margin: 15px 0; text-align: center; border-radius: 10px; font-size: 20px; outline: none; }
+        .btn-bt { background: #0088ff; color: #fff; border: none; padding: 15px; width: 100%; border-radius: 12px; font-weight: bold; cursor: pointer; margin-bottom: 10px; }
+        .btn-start { background: #00ff41; color: #000; border: none; padding: 15px; width: 100%; border-radius: 12px; font-weight: bold; cursor: pointer; }
+        #log { font-size: 11px; color: #666; text-align: left; height: 100px; overflow-y: auto; border-top: 1px solid #222; margin-top: 20px; padding-top: 10px; }
+        .check-box { color: #00ff41; font-size: 14px; margin: 10px 0; }
     </style>
 </head>
 <body>
     <div class="box">
-        <h3>🛰️ SERVER ADM UNIT</h3>
-        <button onclick="connectBT()">🔗 1. ПІДКЛЮЧИТИ CBT001</button>
-        <div id="btStat" style="color:red; font-size:12px; margin-bottom:15px;">BT: OFF</div>
+        <h3 style="letter-spacing: 2px;">🖥️ SERVER ADM UNIT</h3>
+        
+        <button class="btn-bt" onclick="connBT()">🔗 ПІДКЛЮЧИТИ ПРИСТРІЙ</button>
+        <div id="btStatus" class="check-box">⬜ НЕ ПІДКЛЮЧЕНО</div>
+
         <hr style="border: 0.5px solid #222;">
-        <input type="text" id="customId" placeholder="ВВЕДИ СВІЙ ID">
-        <button style="background:#00ff41; color:#000;" onclick="startServer()">🚀 2. ЗАПУСТИТИ МЕРЕЖУ</button>
+        
+        <input type="text" id="customId" value="1234">
+        <button class="btn-start" onclick="startServer()">🚀 ЗАПУСТИТИ СЕРВЕР</button>
+        
         <div id="log"></div>
     </div>
 
     <script>
-        let toyChar, peer;
-        const addLog = (m) => { 
-            const log = document.getElementById('log');
-            log.innerHTML += `> ${m}<br>`; 
-            log.scrollTop = log.scrollHeight;
-        };
+        let ch, peer;
+        const addLog = (m) => { document.getElementById('log').innerHTML += `> ${m}<br>`; };
 
-        async function connectBT() {
+        async function connBT() {
             try {
-                const device = await navigator.bluetooth.requestDevice({
+                const d = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
-                    optionalServices: ['0000fee9-0000-1000-8000-00805f9b34fb']
+                    optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
                 });
-                const server = await device.gatt.connect();
-                const services = await server.getPrimaryServices();
-                for (let s of services) {
-                    const chars = await s.getCharacteristics();
-                    toyChar = chars.find(c => c.properties.write || c.properties.writeWithoutResponse);
-                    if (toyChar) break;
-                }
-                if (toyChar) {
-                    document.getElementById('btStat').innerText = "✅ ПІДКЛЮЧЕНО";
-                    document.getElementById('btStat').style.color = "#00ff41";
-                    addLog("Залізо зачепилося!");
-                }
-            } catch (e) { addLog("BT Error: " + e.message); }
+                const s = await d.gatt.connect();
+                const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
+                ch = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
+                document.getElementById('btStatus').innerText = "✅ ПІДКЛЮЧЕНО: " + d.name;
+                addLog("З'єднано з: " + d.name);
+            } catch(e) { addLog("BT Error: " + e.message); }
         }
 
         function startServer() {
             const myId = document.getElementById('customId').value;
-            if(!myId) return alert("Впиши ID!");
             peer = new Peer(myId);
-            peer.on('open', (id) => { addLog("ID активний: " + id); });
-            peer.on('connection', (conn) => {
-                addLog("Пульт онлайн.");
-                conn.on('data', (data) => {
-                    if (toyChar) {
-                        // ТОЛКАЧКИ (3 БАЙТИ)
-                        const pushBytes = new Uint8Array([0x00, 0x08, data.m2]);
-                        toyChar.writeValueWithoutResponse(pushBytes);
+            
+            peer.on('open', (id) => { 
+                addLog("Спроба запуску сервера...");
+                addLog("Сервер ОНЛАЙН. ID: " + id);
+            });
 
-                        // ВІБРО (7 БАЙТІВ) - Саме той формат, шо робив!
-                        const vibroBytes = new Uint8Array([0x01, 0x01, data.m1, 0x00, 0x00, 0x00, 0x00]);
-                        toyChar.writeValueWithoutResponse(vibroBytes);
-                        
-                        addLog(`M1(Vibro):${data.m1} | M2(Push):${data.m2}`);
+            peer.on('connection', (conn) => {
+                addLog("✅ ПУЛЬТ ПІДКЛЮЧЕНО!");
+                conn.on('data', async (data) => {
+                    if (!ch) return;
+                    let v = data.val;
+                    
+                    if (data.type === 'v') { // Вібро (Твій довгий пакет)
+                        let pkt = new Uint8Array([0x15, 0xFF, 0x04, 0x08, v, v, 0x00, 0x04, 0x08, v, v, 0x01]);
+                        await ch.writeValueWithoutResponse(pkt);
+                    } 
+                    else if (data.type === 'p') { // Толкачка (Твій короткий пакет)
+                        await ch.writeValueWithoutResponse(new Uint8Array([0x00, 0x08, v]));
                     }
                 });
             });

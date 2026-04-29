@@ -4,90 +4,96 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         body { background: #000; color: #0f0; font-family: monospace; text-align: center; padding: 10px; }
-        button { background: #111; color: #0f0; border: 1px solid #0f0; padding: 15px; margin: 5px; width: 140px; cursor: pointer; font-size: 12px; border-radius: 5px; }
-        button:active { background: #0f0; color: #000; }
-        .group { border: 1px solid #333; margin: 15px 0; padding: 15px; border-radius: 10px; }
-        input[type=range] { width: 90%; height: 60px; margin: 20px 0; cursor: pointer; accent-color: #0f0; }
-        .status-box { font-size: 12px; color: #666; margin: 10px; padding: 5px; border: 1px solid #222; min-height: 20px; }
-        h2 { color: #0f0; text-shadow: 0 0 5px #0f0; margin-bottom: 5px; }
+        .group { border: 2px solid #333; margin: 15px 0; padding: 15px; border-radius: 10px; position: relative; }
+        
+        /* Повзунок з градієнтом: блакитний для вібро, жовтий для толкачки */
+        input[type=range] { 
+            width: 95%; height: 60px; cursor: pointer;
+            background: linear-gradient(to right, #00ffff 0%, #00ffff 24%, #ffff00 25%, #ffff00 100%);
+            border-radius: 10px; appearance: none; outline: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            appearance: none; width: 40px; height: 70px; background: #fff; border: 3px solid #0f0; border-radius: 5px;
+        }
+
+        .label { font-size: 20px; font-weight: bold; margin-top: 15px; }
+        .info { font-size: 12px; color: #666; margin-top: 5px; }
+        button { background: #111; color: #0f0; border: 1px solid #0f0; padding: 20px; width: 100%; max-width: 310px; cursor: pointer; margin-top: 20px; font-size: 18px; }
+        
+        .zone-vibro { color: #00ffff; }
+        .zone-pusher { color: #ffff00; }
     </style>
 </head>
 <body>
-    <h2>PUSHER LIVE v5.1</h2>
+    <h3>ANDRII HYBRID CONTROL (7-BYTE)</h3>
     
-    <button onclick="conn()" style="width: 100%; max-width: 310px; border-width: 3px;">🔌 CONNECT</button>
-    <button onclick="hardDisconnect()" style="width: 100%; max-width: 310px; border-color: #f0f; color: #f0f;">🚫 FORCE DISCONNECT</button>
+    <button onclick="conn()">🔌 CONNECT DEVICE</button>
     
-    <div id="out" class="status-box">Disconnected</div>
-
-    <div class="group" style="border-color: #0f0;">
-        <p style="font-weight: bold;">🎮 LIVE CONTROL (11, 8, V)</p>
-        <button onclick="test([11, 8, 32])" style="width: 100%; max-width: 280px; background: #050;">▶️ ПУСК (0x20)</button>
-        <input type="range" id="pusherSlider" min="32" max="100" value="64">
-        <div style="font-size: 20px; margin-top: 10px;">
-            Power: <span id="pVal">64</span> (Hex: <span id="hVal">0x40</span>)
-        </div>
-        <div class="group" style="border: 1px solid #0f0; padding: 10px;">
-    <p>ШУКАЄМО ВІБРО ПО 11 КАНАЛУ:</p>
-    <button onclick="test([11, 1, 100])">ТЕСТ [11, 1]</button>
-    <button onclick="test([11, 2, 100])">ТЕСТ [11, 2]</button>
-    <button onclick="test([11, 3, 100])">ТЕСТ [11, 3]</button>
+    <div class="group">
+        <p id="modeText" class="label">РЕЖИМ: ОЧІКУВАННЯ</p>
+        
+        <input type="range" id="hybridSlider" min="0" max="100" value="0">
+        
+        <div id="valDisplay" class="label">Значення: 0x00</div>
+        <div class="info">01-0F: Вібро | 10-64: Толкачка</div>
     </div>
 
-    <button onclick="stop()" style="color:red; border-color:red; width: 100%; max-width: 310px; font-weight: bold; font-size: 20px;">🛑 STOP</button>
+    <button onclick="stopAll()" style="color:red; border-color:red;">🛑 STOP ALL</button>
 
     <script>
-        let device, ch;
-        const slider = document.getElementById('pusherSlider');
-        const pVal = document.getElementById('pVal');
-        const hVal = document.getElementById('hVal');
-        const out = document.getElementById('out');
-
-        slider.oninput = async function() {
-            let speed = parseInt(this.value);
-            pVal.innerText = speed;
-            hVal.innerText = "0x" + speed.toString(16).toUpperCase();
-            
-            if (ch) {
-                try {
-                    await ch.writeValueWithoutResponse(new Uint8Array([11, 8, speed]));
-                } catch (e) { console.log("Too fast..."); }
-            }
-        };
+        let ch;
+        let lastTime = 0;
+        const slider = document.getElementById('hybridSlider');
+        const modeText = document.getElementById('modeText');
+        const valDisplay = document.getElementById('valDisplay');
 
         async function conn() {
             try {
-                device = await navigator.bluetooth.requestDevice({
+                const d = await navigator.bluetooth.requestDevice({
                     acceptAllDevices: true,
                     optionalServices: ['78667579-7b48-43db-b8c5-7928a6b0a335']
                 });
-                const s = await device.gatt.connect();
+                const s = await d.gatt.connect();
                 const sv = await s.getPrimaryService('78667579-7b48-43db-b8c5-7928a6b0a335');
                 ch = await sv.getCharacteristic('78667579-a914-49a4-8333-aa3c0cd8fedc');
-                out.innerText = "✅ Connected!";
-            } catch (e) {
-                out.innerText = "❌ Error: " + e.message;
+                modeText.innerText = "✅ ПІДКЛЮЧЕНО";
+            } catch (e) { alert("Помилка: " + e.message); }
+        }
+
+        slider.oninput = async function() {
+            let val = parseInt(this.value);
+            let hexStr = val.toString(16).toUpperCase().padStart(2, '0');
+            valDisplay.innerText = "Значення: 0x" + hexStr;
+
+            // Логіка підписів
+            if (val === 0) {
+                modeText.innerText = "СТОП";
+                modeText.className = "label";
+            } else if (val <= 15) {
+                modeText.innerText = "📳 ВІБРАЦІЯ";
+                modeText.className = "label zone-vibro";
+            } else {
+                modeText.innerText = "🚀 ТОЛКАЧКА";
+                modeText.className = "label zone-pusher";
             }
-        }
 
-        async function hardDisconnect() {
-            if (device && device.gatt.connected) {
-                out.innerText = "Killing connection...";
-                await device.gatt.disconnect();
+            // Відправка пакета 15 ff 04 08 [val] 64 00
+            if (ch && Date.now() - lastTime > 60) {
+                lastTime = Date.now();
+                try {
+                    let data = new Uint8Array([0x15, 0xFF, 0x04, 0x08, val, 0x64, 0x00]);
+                    await ch.writeValueWithoutResponse(data);
+                } catch (e) { console.log("Пропуск..."); }
             }
-            // Жорсткий рефреш сторінки, шоб очистити Bluetooth стек браузера
-            setTimeout(() => { window.location.reload(); }, 500);
-        }
+        };
 
-        async function test(arr) {
-            if (!ch) return;
-            await ch.writeValueWithoutResponse(new Uint8Array(arr));
-            out.innerText = "Sent: " + arr;
-        }
-
-        async function stop() {
-            if (ch) await ch.writeValueWithoutResponse(new Uint8Array([11, 8, 0]));
-            out.innerText = "🛑 Stopped";
+        async function stopAll() {
+            if (ch) {
+                await ch.writeValueWithoutResponse(new Uint8Array([0x15, 0xFF, 0x04, 0x08, 0x00, 0x64, 0x00]));
+            }
+            slider.value = 0;
+            modeText.innerText = "СТОП";
+            valDisplay.innerText = "Значення: 0x00";
         }
     </script>
 </body>

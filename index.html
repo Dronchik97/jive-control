@@ -2,19 +2,40 @@
 <html lang="uk">
 <head>
     <meta charset="UTF-8">
-    <title>Jive Control - Start</title>
+    <title>Jive Control - Start Link</title>
     <style>
         body { background: #000; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; font-family: sans-serif; }
-        .start-btn { 
-            background: transparent; color: #00ff41; border: 2px solid #00ff41; 
-            padding: 20px 40px; font-size: 20px; cursor: pointer; border-radius: 50px;
-            text-transform: uppercase; letter-spacing: 2px; transition: 0.3s;
-            box-shadow: 0 0 15px rgba(0,255,41,0.2);
+        .connect-btn { 
+            background: transparent; color: #00ff41; border: 3px solid #00ff41; 
+            padding: 25px 50px; font-size: 22px; cursor: pointer; border-radius: 60px;
+            text-transform: uppercase; letter-spacing: 3px; font-weight: bold;
+            transition: 0.3s; box-shadow: 0 0 20px rgba(0,255,65,0.2);
         }
-        .start-btn:hover { background: #00ff41; color: #000; box-shadow: 0 0 30px #00ff41; }
+        .connect-btn:hover { background: #00ff41; color: #000; box-shadow: 0 0 40px #00ff41; }
     </style>
 </head>
 <body>
-    <button class="start-btn" onclick="location.href='remote.html'">Ввійти в пульт</button>
+
+    <button class="connect-btn" onclick="connectAndGo()">Connect Bluetooth</button>
+
+    <script>
+        async function connectAndGo() {
+            try {
+                // Викликаємо вікно вибору пристрою
+                const device = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: ['0000fee9-0000-1000-8000-00805f9b34fb']
+                });
+                
+                // Якщо пристрій вибрано, зберігаємо його ID (або просто переходимо)
+                // Оскільки Bluetooth-об'єкт не можна просто передати між сторінками, 
+                // ми переходимо на remote.html, де вже будемо працювати.
+                
+                window.location.href = 'remote.html';
+            } catch (e) {
+                alert("Помилка підключення: " + e);
+            }
+        }
+    </script>
 </body>
 </html>
